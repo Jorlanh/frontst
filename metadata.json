@@ -1,0 +1,5 @@
+{
+  "name": "Studr",
+  "description": "Plataforma inteligente de preparação para o ENEM com gerador de questões via IA, simulação de nota TRI e calculadora de aprovação SiSU.",
+  "requestFramePermissions": []
+}
