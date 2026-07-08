@@ -1,5 +1,5 @@
-import React from 'react';
-import { CheckCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { CheckCircle, Settings } from 'lucide-react';
 import { AppView, AreaOfKnowledge } from '../types';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useUser } from '../contexts/UserContext';
@@ -90,6 +90,77 @@ export function AppRouter() {
 
   const [currentReviewExamId, setCurrentReviewExamId] = React.useState<string | null>(null);
   const isMock = view === AppView.MOCK_EXAM;
+
+  // =====================================
+  // ESTADOS PARA O MODAL DE CONFIGURAÇÃO / SENHA
+  // =====================================
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdMessage, setPwdMessage] = useState({ type: '', text: '' });
+
+  // =====================================
+  // FUNÇÃO DE TROCA DE SENHA (ROBUSTA)
+  // =====================================
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setPwdMessage({ type: 'error', text: 'As novas senhas não coincidem.' });
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPwdMessage({ type: 'error', text: 'A nova senha deve ter pelo menos 6 caracteres.' });
+      return;
+    }
+
+    setPwdLoading(true);
+    setPwdMessage({ type: '', text: '' });
+
+    try {
+      const token = localStorage.getItem('studr_token');
+      // Proteção contra URL indefinida
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+      
+      const response = await fetch(`${baseUrl}/users/change-password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+
+      // Tratamento de resposta vazia ou erro
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao alterar a senha.');
+      }
+
+      if (data.token) {
+        localStorage.setItem('studr_token', data.token);
+      }
+
+      setPwdMessage({ type: 'success', text: 'Senha alterada com sucesso!' });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      
+      setTimeout(() => {
+        setIsSettingsOpen(false);
+        setPwdMessage({ type: '', text: '' });
+      }, 2000);
+
+    } catch (err: any) {
+      setPwdMessage({ type: 'error', text: err.message });
+    } finally {
+      setPwdLoading(false);
+    }
+  };
+
   // ─── Full-page views (no app shell) ─────────────────────────────────────────
 
   if (isRestoring) {
@@ -229,7 +300,17 @@ export function AppRouter() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-4">
+          {user && (
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+              title="Configurações da Conta"
+            >
+              <Settings size={20} />
+            </button>
+          )}
+
           <button
             onClick={toggleTheme}
             className="p-2 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-yellow-400 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
@@ -445,6 +526,64 @@ export function AppRouter() {
           <Button onClick={handleSessionExpiredConfirm} className="w-full">Fazer login</Button>
         </div>
       </Modal>
+
+      {/* Settings / Change Password Modal */}
+      <Modal 
+        isOpen={isSettingsOpen} 
+        onClose={() => { setIsSettingsOpen(false); setPwdMessage({ type: '', text: '' }); }} 
+        title="Segurança"
+      >
+        <div className="p-4 md:p-6 space-y-4">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+            Altere sua senha de acesso. A sua conta será desconectada de outros dispositivos por segurança.
+          </p>
+
+          <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Senha Atual</label>
+              <input 
+                type="password" 
+                value={currentPassword} 
+                onChange={e => setCurrentPassword(e.target.value)} 
+                className="w-full h-12 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 dark:text-white"
+                required 
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nova Senha</label>
+              <input 
+                type="password" 
+                value={newPassword} 
+                onChange={e => setNewPassword(e.target.value)} 
+                className="w-full h-12 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 dark:text-white"
+                placeholder="Mínimo 6 caracteres"
+                required 
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Confirmar Nova Senha</label>
+              <input 
+                type="password" 
+                value={confirmPassword} 
+                onChange={e => setConfirmPassword(e.target.value)} 
+                className="w-full h-12 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 dark:text-white"
+                required 
+              />
+            </div>
+
+            {pwdMessage.text && (
+              <div className={`p-3 rounded-xl text-sm font-bold mt-2 ${pwdMessage.type === 'error' ? 'bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'}`}>
+                {pwdMessage.text}
+              </div>
+            )}
+
+            <Button type="submit" disabled={pwdLoading} className="h-12 w-full mt-2 font-black">
+              {pwdLoading ? 'Salvando...' : 'Salvar Nova Senha'}
+            </Button>
+          </form>
+        </div>
+      </Modal>
+
     </div>
   );
 }

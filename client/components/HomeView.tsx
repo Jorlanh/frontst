@@ -115,6 +115,7 @@ export default function HomeView() {
   const isPremium = user?.isPremium;
   const isMockOnly = user?.subscriptionStatus === 'MOCK_ONLY';
   const isAdmin = user?.role === 'ADMIN';
+  
   // Controle de estado para o Modal das Regras da Torre
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
 
