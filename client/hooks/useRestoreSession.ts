@@ -41,14 +41,21 @@ export function useRestoreSession({
       if (token) {
         fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
           .then(r => {
+            // Captura o token atual do storage após o retorno da API para evitar Race Conditions
+            const currentToken = localStorage.getItem('studr_token');
+
             if (r.status === 401 || r.status === 403) {
-              // Token expired on initial restore — clear state and send to login silently
-              console.warn('[Session] Token inválido na validação inicial, redirecionando para login');
-              localStorage.removeItem('studr_token');
-              localStorage.removeItem('studr_user');
-              localStorage.removeItem('studr_view');
-              setUser(null);
-              navigate(AppView.AUTH);
+              // Só realiza o logoff forçado se o token não foi substituído por um novo login neste meio tempo
+              if (currentToken === token) {
+                console.warn('[Session] Token inválido na validação inicial, redirecionando para login');
+                localStorage.removeItem('studr_token');
+                localStorage.removeItem('studr_user');
+                localStorage.removeItem('studr_view');
+                setUser(null);
+                navigate(AppView.AUTH);
+              } else {
+                console.info('[Session] Token expirado do request antigo ignorado. O usuário já fez um novo login.');
+              }
             } else if (r.ok) {
               r.json().then(data => {
                 if (data.user) {

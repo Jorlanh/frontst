@@ -2,17 +2,42 @@ import React, { useState, useEffect } from 'react';
 import { fetchGamificationState, ServerGamificationState, GamProgress, GamBadge } from '../services/gamification';
 import { apiRequest } from '../services/apiService';
 import { Card, Button, LoadingSpinner } from './UIComponents';
-import { GAMIFICATION_SUBJECTS } from '../constants';
 import { AreaOfKnowledge } from '../types';
 
 interface GamificationViewProps {
   onBack: () => void;
-  onReviewErrors: () => void;
+  // 🔥 Ajustado: Aceita areaId e subTopic opcionalmente, e a flag isReviewMode
+  onReviewErrors: (areaId?: string, subTopic?: string, isReviewMode?: boolean) => void;
   isLoading?: boolean;
 }
 
-// ─── League helpers ───────────────────────────────────────────────────────────
+// ─── Constants (Mapeamento hierárquico) ───────────────────────────────────────
+const HIERARCHICAL_SUBJECTS: Record<string, Record<string, string[]>> = {
+  "LINGUAGENS": {
+    "Português": ["Gramática", "Interpretação de Texto", "Morfologia", "Sintaxe", "Semântica"],
+    "Literatura": ["Quinhentismo", "Barroco", "Arcadismo", "Romantismo", "Realismo", "Modernismo", "Contemporânea"],
+    "Inglês": ["Reading Comprehension", "Vocabulary", "Grammar"],
+    "Espanhol": ["Comprensión Lectora", "Vocabulario", "Gramática"],
+    "Artes": ["Artes Visuais", "Música", "Teatro", "História da Arte"],
+    "Educação Física": ["Esportes", "Práticas Corporais", "Saúde"]
+  },
+  "HUMANAS": {
+    "História": ["Brasil Colônia", "Brasil Império", "Brasil República", "Idade Antiga", "Idade Média", "Idade Moderna", "Idade Contemporânea", "Guerra Fria"],
+    "Geografia": ["Geopolítica", "Geografia Física", "Geografia Agrária", "Geografia Urbana", "Cartografia", "Meio Ambiente"],
+    "Filosofia": ["Filosofia Antiga", "Filosofia Medieval", "Filosofia Moderna", "Filosofia Contemporânea", "Ética"],
+    "Sociologia": ["Sociologia Clássica", "Sociologia Brasileira", "Cultura", "Trabalho", "Movimentos Sociais"]
+  },
+  "NATUREZA": {
+    "Física": ["Mecânica", "Termologia", "Óptica", "Ondulatória", "Eletromagnetismo", "Física Moderna"],
+    "Química": ["Química Geral", "Físico-Química", "Química Orgânica", "Meio Ambiente"],
+    "Biologia": ["Ecologia", "Citologia", "Genética", "Botânica", "Zoologia", "Fisiologia Humana"]
+  },
+  "EXATAS": {
+    "Matemática": ["Matemática Básica", "Geometria Plana", "Geometria Espacial", "Funções", "Estatística", "Probabilidade", "Trigonometria", "Matemática Financeira"]
+  }
+};
 
+// ─── League helpers ───────────────────────────────────────────────────────────
 const LEAGUE_LABEL: Record<string, string> = {
   BRONZE:  'Bronze',
   SILVER:  'Prata',
@@ -40,7 +65,6 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 interface RankingEntry {
   rank: number;
   name: string;
@@ -58,9 +82,8 @@ interface RankingData {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-
 const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErrors, isLoading = false }) => {
-  const [activeTab, setActiveTab] = useState<'PROGRESS' | 'RANKING'>('RANKING');
+  const [activeTab, setActiveTab] = useState<'PROGRESS' | 'RANKING'>('PROGRESS');
 
   // Gamification state
   const [state, setState] = useState<ServerGamificationState | null>(null);
@@ -71,6 +94,16 @@ const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErr
   const [ranking, setRanking] = useState<RankingData | null>(null);
   const [loadingRanking, setLoadingRanking] = useState(true);
   const [errorRanking, setErrorRanking] = useState<string | null>(null);
+
+  // Controle do Acordeão de Matérias
+  const [expandedSubjects, setExpandedSubjects] = useState<Record<string, boolean>>({});
+
+  const toggleSubject = (subjectName: string) => {
+    setExpandedSubjects(prev => ({
+      ...prev,
+      [subjectName]: !prev[subjectName]
+    }));
+  };
 
   useEffect(() => {
     fetchGamificationState()
@@ -174,13 +207,48 @@ const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErr
     if (!state)       return null;
 
     const { xp, title, nextLevelXp, currentLevelXp, streak, badges, progress } = state;
+    
     const progressPercent = nextLevelXp && nextLevelXp > currentLevelXp
       ? Math.min(100, Math.round(((xp.totalXp - currentLevelXp) / (nextLevelXp - currentLevelXp)) * 100))
       : 100;
 
-    // Build subject lookup
+    // Normalizando os nomes das matérias (Resolve o problema do 0/0)
     const progressBySubject: Record<string, GamProgress> = {};
-    for (const p of progress) progressBySubject[p.subject] = p;
+    for (const p of progress) {
+      if (p.subject) {
+         progressBySubject[p.subject.trim().toLowerCase()] = p;
+      }
+    }
+
+    // Função auxiliar para calcular métricas de forma rigorosa
+    const getStats = (subjectName: string, isParent = false) => {
+      const normalizedKey = subjectName.trim().toLowerCase();
+      
+      if (!isParent) {
+        return progressBySubject[normalizedKey] || { questionsAnswered: 0, questionsCorrect: 0 };
+      }
+      
+      let answered = 0;
+      let correct = 0;
+      
+      if (progressBySubject[normalizedKey]) {
+        answered += progressBySubject[normalizedKey].questionsAnswered;
+        correct += progressBySubject[normalizedKey].questionsCorrect;
+      }
+
+      for (const area of Object.keys(HIERARCHICAL_SUBJECTS)) {
+        if (HIERARCHICAL_SUBJECTS[area][subjectName]) {
+          for (const sub of HIERARCHICAL_SUBJECTS[area][subjectName]) {
+            const subKey = sub.trim().toLowerCase();
+            if (progressBySubject[subKey]) {
+              answered += progressBySubject[subKey].questionsAnswered;
+              correct += progressBySubject[subKey].questionsCorrect;
+            }
+          }
+        }
+      }
+      return { questionsAnswered: answered, questionsCorrect: correct };
+    };
 
     // Group badges by category
     const badgesByCategory: Record<string, GamBadge[]> = {};
@@ -262,57 +330,119 @@ const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErr
           )}
         </div>
 
-        {/* Right: Subject Progress Map */}
+        {/* Right: Subject Progress Map Hierárquico */}
         <div className="md:col-span-2">
           <Card className="h-full">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-slate-100">Mapa de Progresso ENEM</h3>
-              <span className="text-sm text-gray-500 dark:text-slate-400">Questões certas por matéria</span>
+              <div>
+                <h3 className="text-xl font-bold text-gray-800 dark:text-slate-100">Raio-X de Desempenho</h3>
+                <span className="text-sm text-gray-500 dark:text-slate-400">Análise de acertos e mapeamento de erros.</span>
+              </div>
+              
+              {/* BOTÃO MESTRE: Traz TODAS as questões erradas do banco de dados (isReviewMode = true) */}
+              <Button 
+                variant="primary" 
+                onClick={() => onReviewErrors(undefined, undefined, true)} 
+                className="text-sm shadow-md bg-red-600 hover:bg-red-700 text-white border-none"
+                loading={isLoading}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Carregando...' : '🚀 Revisar Todos os Erros'}
+              </Button>
             </div>
-            <div className="space-y-8">
-              {(Object.keys(GAMIFICATION_SUBJECTS) as Array<keyof typeof GAMIFICATION_SUBJECTS>).map((area) => (
+            
+            <div className="space-y-6">
+              {Object.keys(HIERARCHICAL_SUBJECTS).map((area) => (
                 <div key={area} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-gray-100 dark:border-slate-800">
                   <h4 className="font-bold text-enem-blue dark:text-blue-400 mb-4 border-b border-gray-200 dark:border-slate-700 pb-2">{area}</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {GAMIFICATION_SUBJECTS[area].map((subject) => {
-                      const stats = progressBySubject[subject] || { questionsAnswered: 0, questionsCorrect: 0 };
-                      const accuracy = stats.questionsAnswered > 0 ? Math.round((stats.questionsCorrect / stats.questionsAnswered) * 100) : 0;
-                      const GOAL = 50;
-                      const barPct = Math.min(100, Math.round((stats.questionsCorrect / GOAL) * 100));
+                  
+                  <div className="flex flex-col gap-3">
+                    {Object.keys(HIERARCHICAL_SUBJECTS[area]).map((parentSubject) => {
+                      const parentStats = getStats(parentSubject, true);
+                      const isExpanded = expandedSubjects[parentSubject];
+                      const accuracy = parentStats.questionsAnswered > 0 ? Math.round((parentStats.questionsCorrect / parentStats.questionsAnswered) * 100) : 0;
+                      const errors = parentStats.questionsAnswered - parentStats.questionsCorrect;
+                      const barPct = Math.min(100, Math.round((parentStats.questionsCorrect / (parentStats.questionsAnswered || 1)) * 100));
+
                       return (
-                        <div key={subject} className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all">
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="font-semibold text-gray-700 dark:text-slate-200 text-sm truncate pr-2" title={subject}>{subject}</span>
+                        <div key={parentSubject} className="flex flex-col bg-white dark:bg-slate-900 rounded-lg border border-gray-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                          
+                          {/* PARENT ROW (Clicável para expandir) */}
+                          <div 
+                            onClick={() => toggleSubject(parentSubject)}
+                            className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors"
+                          >
+                            <div className="flex items-center gap-3 w-1/3">
+                              <span className="text-lg text-slate-400">{isExpanded ? '▼' : '▶'}</span>
+                              <span className="font-bold text-gray-800 dark:text-slate-100 truncate" title={parentSubject}>{parentSubject}</span>
+                            </div>
+                            
+                            <div className="w-1/3 hidden sm:flex items-center gap-2 px-4">
+                              <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2">
+                                <div className={`h-2 rounded-full ${accuracy >= 70 ? 'bg-green-500' : accuracy >= 40 ? 'bg-yellow-400' : 'bg-red-500'}`} style={{ width: `${barPct}%` }}></div>
+                              </div>
+                              <span className="text-xs font-bold text-gray-500 w-8 text-right">{accuracy}%</span>
+                            </div>
+
+                            <div className="flex flex-col items-end w-1/3 text-xs">
+                              <span className="text-gray-500 dark:text-slate-400"><strong className="text-green-600 dark:text-green-400">{parentStats.questionsCorrect}</strong> certas</span>
+                              <span className="text-gray-400 dark:text-slate-500"><strong className="text-red-500 dark:text-red-400">{errors}</strong> erradas</span>
+                            </div>
                           </div>
-                          <div className="flex items-end gap-2 mb-1">
-                            <span className="text-2xl font-bold text-gray-800 dark:text-slate-100">{accuracy}%</span>
-                            <span className="text-xs text-gray-400 dark:text-slate-500 mb-1">acerto</span>
-                          </div>
-                          <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-1.5 mb-2">
-                            <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${barPct}%` }}></div>
-                          </div>
-                          <div className="text-[10px] text-gray-500 dark:text-slate-500">
-                            {stats.questionsAnswered} respondidas • {stats.questionsCorrect} certas
-                          </div>
+
+                          {/* CHILDREN ROWS (Acordeão) */}
+                          {isExpanded && (
+                            <div className="bg-slate-50/50 dark:bg-slate-900/50 border-t border-gray-100 dark:border-slate-800 divide-y divide-gray-100 dark:divide-slate-800">
+                              {HIERARCHICAL_SUBJECTS[area][parentSubject].map((subTopic) => {
+                                const subStats = getStats(subTopic, false);
+                                const subAccuracy = subStats.questionsAnswered > 0 ? Math.round((subStats.questionsCorrect / subStats.questionsAnswered) * 100) : 0;
+                                const subErrors = subStats.questionsAnswered - subStats.questionsCorrect;
+
+                                return (
+                                  <div key={subTopic} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 pl-10 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                    <div className="flex-1 w-full sm:w-auto mb-2 sm:mb-0">
+                                      <span className="text-sm font-semibold text-gray-700 dark:text-slate-300">{subTopic}</span>
+                                      <div className="text-[10px] text-gray-500 dark:text-slate-500 flex gap-3 mt-1">
+                                        <span>Total: {subStats.questionsAnswered}</span>
+                                        <span className="text-green-600">✓ {subStats.questionsCorrect}</span>
+                                        <span className={subErrors > 0 ? "text-red-500 font-bold" : "text-gray-400"}>✗ {subErrors}</span>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                                      <div className={`text-xs font-bold px-2 py-1 rounded-md ${subAccuracy >= 70 ? 'bg-green-100 text-green-700' : subAccuracy >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                        {subAccuracy}%
+                                      </div>
+                                      
+                                      {/* APENAS O BOTÃO PRATICAR: Chama a IA para gerar novas perguntas (isReviewMode = false) */}
+                                      <button 
+                                        className="text-[11px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm text-enem-blue font-bold px-4 py-1.5 rounded-md hover:border-enem-blue transition-colors disabled:opacity-50"
+                                        disabled={isLoading}
+                                        onClick={() => {
+                                           const areaMapped = area === "LINGUAGENS" ? "Linguagens" :
+                                                              area === "HUMANAS" ? "Humanas" :
+                                                              area === "NATUREZA" ? "Natureza" : "Exatas";
+                                           
+                                           // Passa isReviewMode = false, acionando a IA
+                                           onReviewErrors(areaMapped, subTopic, false); 
+                                        }}
+                                      >
+                                        Praticar Tópico
+                                      </button>
+                                      
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
                         </div>
                       );
                     })}
                   </div>
                 </div>
               ))}
-            </div>
-
-            {/* Missed review shortcut */}
-            <div className="mt-6 flex justify-end">
-              <Button
-                variant="primary"
-                onClick={onReviewErrors}
-                className="text-sm"
-                loading={isLoading}
-                disabled={isLoading}
-              >
-                {isLoading ? 'Gerando questões...' : '🚀 Revisar Erros Agora'}
-              </Button>
             </div>
           </Card>
         </div>

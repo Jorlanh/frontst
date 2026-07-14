@@ -430,11 +430,19 @@ export function AppRouter() {
       {view === AppView.ESSAY_BANK && <EssayModelBank onBack={() => navigate(AppView.HOME)} />}
       {view === AppView.STUDY_GUIDE && <StudyMapView onBack={() => navigate(AppView.HOME)} />}
       {view === AppView.GAMIFICATION && (
-        <GamificationView
-          onBack={() => navigate(AppView.HOME)}
-          onReviewErrors={() => startPractice(AreaOfKnowledge.MIXED, 'Revisão de Erros', true)}
-          isLoading={practiceLoading}
-        />
+        <GamificationView 
+          onBack={() => setView(AppView.HOME)} 
+          onReviewErrors={(areaId, subTopic) => {
+              // Se vier uma submatéria específica, inicie a prática focada nela!
+              if (subTopic) {
+                  // O startPractice precisa receber (Area, Tópico Especifico)
+                  startPractice(areaId || AreaOfKnowledge.MIXED, subTopic);
+              } else {
+                  // Se for o botão geral (que não passa subTopic), manda revisar tudo
+                  reviewErrors(); // Ou qualquer função que você usa pra gerar revisão geral
+              }
+          }} 
+      />
       )}
       
       {/* 🗼 TOWER VIEW CONECTADA AO GAME LOOP */}

@@ -22,11 +22,9 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
   const [sisuPredictions, setSisuPredictions] = useState<SisuPrediction[]>([]);
   const [recommendations, setRecommendations] = useState<StudyRecommendation[]>([]);
   
-  // 🗼 Tower Mode State
   const [towerFeedback, setTowerFeedback] = useState<any>(null);
   const [loadingTower, setLoadingTower] = useState(false);
 
-  // Sisu/Prouni Form State
   const [program, setProgram] = useState("SiSU");
   const [course, setCourse] = useState("");
   const [uni, setUni] = useState("");
@@ -34,16 +32,12 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
   const correctCount = questions.filter(q => userAnswers[q.id] === q.correctIndex).length;
   const accuracy = questions.length > 0 ? (correctCount / questions.length) * 100 : 0;
 
-  
-  // 🔥 CORREÇÃO REAL: Pontuação proporcional pura (0 a 1000)
-  // Se acertar 0, a nota é 0. Se acertar tudo, é 1000.
   const calculatedScore = Math.round((correctCount / (questions.length || 1)) * 1000);
 
   useEffect(() => {
     setScore(calculatedScore);
   }, [calculatedScore]);
 
-  // 🗼 EFFECT: Interceptador do Modo Jornada (A Escalada)
   useEffect(() => {
     const mode = sessionStorage.getItem('studr_exam_mode');
     const floorDataStr = sessionStorage.getItem('studr_current_tower_floor');
@@ -53,7 +47,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
       const floorData = JSON.parse(floorDataStr);
       const token = localStorage.getItem('studr_token');
 
-      // Submete o resultado para o motor da Torre no Backend
       fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/tower/submit`, {
         method: 'POST',
         headers: {
@@ -75,11 +68,9 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
     }
   }, [calculatedScore]);
 
-  // CORREÇÃO DO SISU / PROUNI / FIES (White Screen Fix)
   const handleSisuAnalysis = async () => {
     if (!course || course.length < 3) return;
     setLoadingAnalysis(true);
-    // REMOVIDO: setSisuPredictions([]); <- Não limpe aqui para evitar o "piscar" de dados vazios
     
     try {
       const queryContext = `${program} ${uni ? `- ${uni}` : ''}`;
@@ -116,7 +107,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
     doc.save("meu_relatorio_studr.pdf");
   };
 
-  // 1. Dicionário de normalização (Para garantir o nome bonito no gráfico)
   const SHORT_AREA_LABELS: Record<string, string> = {
     "NATUREZA": "Natureza",
     "HUMANAS": "Humanas",
@@ -124,14 +114,12 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
     "EXATAS": "Exatas"
   };
 
-  // 2. Lógica de extração com normalização de texto (Busca por aproximação)
   const chartData = [
     { id: "NATUREZA", search: "natureza" },
     { id: "HUMANAS", search: "humana" },
     { id: "LINGUAGENS", search: "linguagem" },
     { id: "EXATAS", search: "exatas" }
   ].map(item => {
-    // Procura na questão ignorando acentos e maiúsculas
     const qs = questions.filter(q => {
       const areaText = String(q.area || "").toLowerCase();
       const subjectText = String(q.subject || "").toLowerCase();
@@ -139,7 +127,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
     });
 
     if (qs.length === 0) return null;
-
     const correct = qs.filter(q => userAnswers[q.id] === q.correctIndex).length;
     
     return { 
@@ -151,8 +138,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-fade-in p-4 pb-20">
-      
-      {/* 🗼 BANNER DE FEEDBACK DA TORRE (DUOLINGO STYLE) */}
       {loadingTower && (
         <div className="w-full p-8 bg-blue-50 border-4 border-blue-200 rounded-3xl text-center animate-pulse">
           <LoadingSpinner size="sm" />
@@ -162,9 +147,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
 
       {towerFeedback && (
         <div className={`w-full p-8 mb-4 rounded-3xl border-b-8 text-center animate-fade-in-up shadow-2xl ${
-          towerFeedback.isWin 
-            ? 'bg-green-500 border-green-700 text-white' 
-            : 'bg-red-500 border-red-700 text-white'
+          towerFeedback.isWin ? 'bg-green-500 border-green-700 text-white' : 'bg-red-500 border-red-700 text-white'
         }`}>
           <div className="text-5xl mb-4">
             {towerFeedback.isWin ? '🎯' : '💀'}
@@ -194,7 +177,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
         </div>
       )}
 
-      {/* Header with Back Button */}
       <div className="flex flex-col md:flex-row justify-between items-center relative gap-4">
         <Button onClick={onBackToHome} variant="outline" className="text-sm border-slate-200 dark:border-slate-800 dark:text-slate-400 md:absolute md:left-0">
           ← Voltar ao Início
@@ -242,7 +224,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
         </Card>
       </div>
 
-      {/* SiSU Simulator Section */}
       <Card className="border-t-8 border-enem-blue bg-white dark:bg-slate-900 p-8 shadow-2xl rounded-3xl">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
           <div>
@@ -283,7 +264,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
             </div>
         )}
 
-        {/* RENDENRIZAÇÃO SEGURA - Previne a Tela Branca e Dados Vazios */}
         {!loadingAnalysis && sisuPredictions.length > 0 && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-6">
             {sisuPredictions.map((pred, i) => {
@@ -291,8 +271,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
               const chanceLower = chance.toLowerCase();
               const isAlta = chanceLower.includes('alta');
               const isMedia = chanceLower.includes('média') || chanceLower.includes('media');
-              
-              // Garante que a nota de corte apareça mesmo se vier como string ou nula
               const cutOff = pred.cutOffScore ? String(pred.cutOffScore) : '---';
 
               return (
@@ -309,21 +287,20 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
                     <div className="text-lg font-black text-enem-blue dark:text-blue-400">{pred.course || course}</div>
                   </div>
                   <div className="mt-auto pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Corte Real</span>
+                    <span className="text-white tracking-widest text-[10px] font-black text-slate-400 uppercase">Corte Real</span>
                     <span className="text-xl font-black text-slate-900 dark:text-slate-100">{cutOff}</span>
                   </div>
                 </div>
               );
-          })}
+            })}
           </div>
         )}
       </Card>
 
-      {/* AI Recommendations */}
       {recommendations.length > 0 && (
         <div className="grid grid-cols-1 gap-4">
             <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter flex items-center gap-2 mb-2">
-                📝 Plano de Estudos Gerado
+                Acompanhamento e Próximos Passos
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {recommendations.map((rec, i) => (
@@ -344,7 +321,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
         </div>
       )}
 
-      {/* Ações Finais */}
       <div className="flex flex-col sm:flex-row gap-4 justify-center pt-10">
         <Button onClick={generatePDFReport} className="w-full sm:w-auto px-10 py-4 bg-green-600 hover:bg-green-700 text-white font-black shadow-xl rounded-2xl border-0 uppercase text-xs tracking-widest">
           📥 Baixar PDF

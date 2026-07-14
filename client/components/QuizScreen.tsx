@@ -86,7 +86,6 @@ export default function QuizScreen() {
                       sessionStorage.removeItem('studr_exam_mode'); 
                       navigate(AppView.TOWER);
                   } else {
-                      // 🔥 MODIFICAÇÃO AQUI: Se não for Torre, vai para Resultados
                       practice.finalizeWithPartial(true); 
                       navigate(AppView.RESULTS);
                   }
@@ -128,12 +127,25 @@ export default function QuizScreen() {
   const effectiveTargetCount = isMock ? simuladoTargetCount : (isTowerMode ? towerTargetCount : '∞');
   const sessionHeaderTitle = isMock ? 'Simulado ENEM' : (isTowerMode ? `Batalha: Prédio ${towerLevel}` : 'Modo Prática Infinita');
 
+  // 🔥 MAPEAMENTO DE COR E TEXTO REAL DA DIFICULDADE
+  const getDifficultyColor = (diff: string) => {
+    const d = String(diff).toUpperCase();
+    if (d === 'EASY' || d === 'FÁCIL' || d === 'FACIL') return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800/50';
+    if (d === 'HARD' || d === 'DIFÍCIL' || d === 'DIFICIL') return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800/50';
+    return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-800/50';
+  };
+
+  const getDifficultyLabel = (diff: string) => {
+    const d = String(diff).toUpperCase();
+    if (d === 'EASY' || d === 'FÁCIL' || d === 'FACIL') return 'Fácil';
+    if (d === 'HARD' || d === 'DIFÍCIL' || d === 'DIFICIL') return 'Difícil';
+    return 'Média';
+  };
+
   return (
     <div className="max-w-4xl mx-auto pt-6 px-4 pb-24">
-      {/* CABEÇALHO CORRIGIDO */}
+      {/* CABEÇALHO */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 gap-4 transition-colors">
-        
-        {/* BOTÕES DE AÇÃO */}
         <div className="flex gap-2 w-full md:w-auto">
           <Button
             variant="outline"
@@ -157,7 +169,6 @@ export default function QuizScreen() {
           )}
         </div>
 
-        {/* PROGRESSO */}
         <div className="flex items-center gap-3">
           <div className="h-2 w-24 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
             <div className="h-full bg-enem-blue dark:bg-blue-500 animate-shimmer" style={{ width: `${(currentQuestionIndex / (typeof effectiveTargetCount === 'number' ? effectiveTargetCount : 1)) * 100}%` }}></div>
@@ -192,9 +203,15 @@ export default function QuizScreen() {
             </span>
           </div>
           {currentQ && (
-            <Badge color={isTowerMode ? "purple" : "blue"} className="mt-1 shadow-sm">
-              {currentQ.area}
-            </Badge>
+            <div className="flex gap-2 mt-1 items-center">
+              <Badge color={isTowerMode ? "purple" : "blue"} className="shadow-sm">
+                {currentQ.area}
+              </Badge>
+              {/* 🔥 EXIBIÇÃO DA ETANQUETA CORRIGIDA DE ACORDO COM O BANCO */}
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${getDifficultyColor(currentQ.difficulty)}`}>
+                 {getDifficultyLabel(currentQ.difficulty)}
+              </span>
+            </div>
           )}
         </div>
       </div>
@@ -243,7 +260,6 @@ export default function QuizScreen() {
 
       <div className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 p-4 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] dark:shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.3)] z-50 backdrop-blur-md bg-white/90 dark:bg-slate-900/90 transition-colors">
         <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-
           <div className="w-full md:w-auto flex justify-between md:justify-start gap-4 order-2 md:order-1">
             <Button
               onClick={handlePrevious}

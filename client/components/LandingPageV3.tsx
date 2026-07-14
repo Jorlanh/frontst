@@ -16,6 +16,21 @@ interface LandingPageProps {
 const LandingPageV3: React.FC<LandingPageProps> = ({ onStart, onRegister, onLogin, onAffiliate, onPricing, onTerms, onPrivacy }) => {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
+  
+  // 🔥 NOVO: Controle do Banner de Consentimento
+  const [showCookieBanner, setShowCookieBanner] = useState(false);
+
+  useEffect(() => {
+    const cookiesAccepted = localStorage.getItem('studr_cookies_accepted');
+    if (!cookiesAccepted) {
+      setShowCookieBanner(true);
+    }
+  }, []);
+
+  const handleAcceptCookies = () => {
+    localStorage.setItem('studr_cookies_accepted', 'true');
+    setShowCookieBanner(false);
+  };
 
   const slides = [
     {
@@ -76,11 +91,8 @@ const LandingPageV3: React.FC<LandingPageProps> = ({ onStart, onRegister, onLogi
     }
   ];
 
-
-
   const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % slides.length);
   const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
-
 
   const toggleFaq = (index: number) => {
     setOpenFaqIndex(openFaqIndex === index ? null : index);
@@ -120,7 +132,7 @@ const LandingPageV3: React.FC<LandingPageProps> = ({ onStart, onRegister, onLogi
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-gray-900 font-sans selection:bg-blue-200 selection:text-blue-900">
+    <div className="min-h-screen bg-slate-50 text-gray-900 font-sans selection:bg-blue-200 selection:text-blue-900 relative">
       {/* Header */}
       <header className="fixed w-full bg-white/80 backdrop-blur-md z-50 border-b border-gray-100 transition-all">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
@@ -222,7 +234,7 @@ const LandingPageV3: React.FC<LandingPageProps> = ({ onStart, onRegister, onLogi
         </div>
       </section>
 
-      {/* SEÇÃO 1 - Problema (Texto Direita, Img Esquerda) */}
+      {/* SEÇÃO 1 - Problema */}
       <section className="py-24 px-6 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
           <div className="order-2 lg:order-1">
@@ -255,7 +267,7 @@ const LandingPageV3: React.FC<LandingPageProps> = ({ onStart, onRegister, onLogi
         </div>
       </section>
 
-      {/* SEÇÃO 2 - Solução (Texto Esquerda, Img Direita) */}
+      {/* SEÇÃO 2 - Solução */}
       <section className="py-24 px-6 bg-slate-50 overflow-hidden">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
           <div className="space-y-6">
@@ -277,9 +289,8 @@ const LandingPageV3: React.FC<LandingPageProps> = ({ onStart, onRegister, onLogi
         </div>
       </section>
 
-      {/* SEÇÃO 3 — CARROSSEL DE FUNCIONALIDADES (PREMIUM) */}
+      {/* SEÇÃO 3 — CARROSSEL */}
       <section className="py-24 px-6 bg-slate-900 overflow-hidden relative">
-        {/* Background Glows */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-enem-blue/10 blur-[120px] rounded-full pointer-events-none"></div>
 
         <div className="max-w-7xl mx-auto relative z-10">
@@ -293,11 +304,9 @@ const LandingPageV3: React.FC<LandingPageProps> = ({ onStart, onRegister, onLogi
           </div>
 
           <div className="relative group">
-            {/* Main Content Area */}
             <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-[3rem] p-8 md:p-12 shadow-2xl">
               <div className="grid lg:grid-cols-2 gap-12 items-center">
                 
-                {/* Left Side: Copy */}
                 <div className="space-y-8 order-2 lg:order-1 transition-all duration-500 transform">
                   <div className={`inline-flex p-3 rounded-2xl bg-gradient-to-br ${slides[currentSlide].color} shadow-lg shadow-blue-500/20`}>
                     {React.cloneElement(slides[currentSlide].icon as React.ReactElement<{ className?: string }>, { className: "w-8 h-8 text-white" })}
@@ -331,10 +340,8 @@ const LandingPageV3: React.FC<LandingPageProps> = ({ onStart, onRegister, onLogi
                   </div>
                 </div>
 
-                {/* Right Side: Image with Mockup Style */}
                 <div className="order-1 lg:order-2 relative flex justify-center">
                    <div className="relative w-full max-w-[280px] aspect-[9/16] bg-slate-950 rounded-[3rem] p-2.5 shadow-[0_0_50px_rgba(59,130,246,0.2)] border-[8px] border-slate-800 overflow-hidden transform hover:-rotate-1 transition-transform duration-700">
-                      {/* Notch */}
                       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-slate-800 rounded-b-3xl z-20"></div>
                       
                       <div className="w-full h-full rounded-[2rem] overflow-hidden relative bg-white">
@@ -347,14 +354,12 @@ const LandingPageV3: React.FC<LandingPageProps> = ({ onStart, onRegister, onLogi
                       </div>
                    </div>
                    
-                   {/* Decorative elements */}
                    <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-blue-500/20 blur-3xl rounded-full"></div>
                    <div className="absolute -top-6 -left-6 w-32 h-32 bg-cyan-500/20 blur-3xl rounded-full"></div>
                 </div>
               </div>
             </div>
 
-            {/* Navigation Arrows */}
             <button 
               onClick={prevSlide}
               className="absolute left-[-20px] md:left-[-40px] top-1/2 -translate-y-1/2 p-4 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white border border-white/10 transition-all opacity-0 group-hover:opacity-100 z-30"
@@ -371,8 +376,7 @@ const LandingPageV3: React.FC<LandingPageProps> = ({ onStart, onRegister, onLogi
         </div>
       </section>
 
-
-      {/* SEÇÃO 4 - TESTIMONIALS (Previously unused!) */}
+      {/* SEÇÃO 4 - TESTIMONIALS */}
       <section className="py-24 px-6 bg-slate-50 border-t border-slate-100">
          <div className="max-w-7xl mx-auto">
             <h2 className="text-3xl md:text-5xl font-bold text-center text-slate-900 mb-16">Eles confiaram na IA. <br/> <span className="text-enem-blue">Eles passaram.</span></h2>
@@ -450,6 +454,44 @@ const LandingPageV3: React.FC<LandingPageProps> = ({ onStart, onRegister, onLogi
           </div>
         </div>
       </footer>
+
+      {/* 🔥 AVISO DE COOKIES - ESTILO CARD FLUTUANTE */}
+      {showCookieBanner && (
+        <div className="fixed bottom-6 left-6 z-[100] max-w-sm w-[calc(100%-3rem)] md:w-full bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 p-6 animate-fade-in-up">
+          <div className="flex items-center gap-2 mb-3">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-slate-700">
+              <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"></path>
+              <path d="M8.5 8.5v.01"></path>
+              <path d="M16 12.5v.01"></path>
+              <path d="M12 16v.01"></path>
+              <path d="M11 12.5v.01"></path>
+            </svg>
+            <h3 className="font-bold text-slate-800 text-base">Política de Cookies</h3>
+          </div>
+          
+          <p className="text-slate-600 text-sm leading-relaxed mb-6">
+            Nós e nossos parceiros usamos cookies, pixels, SDKs, APIs e integrações de servidor para servidor. A Studr não usa essas tecnologias para vender anúncios de terceiros em nossos serviços. A Studr as utiliza para medir o desempenho de nossos serviços e melhorar a inteligência artificial. Se você continuar usando a Studr sem ajustar suas configurações, estará consentindo com o uso dessas tecnologias descritas em nossa{' '}
+            <button onClick={onPrivacy} className="text-enem-blue hover:underline font-medium">
+              Política de Privacidade
+            </button>.
+          </p>
+
+          <div className="flex gap-3">
+            <button 
+              onClick={handleAcceptCookies} 
+              className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
+            >
+              Recusar opcionais
+            </button>
+            <button 
+              onClick={handleAcceptCookies} 
+              className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold rounded-xl transition-colors shadow-md"
+            >
+              Entendi
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

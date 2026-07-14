@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Card, Badge, LoadingSpinner } from './UIComponents';
 import Logo from './Logo';
+import { CheckCircle2, Lock } from 'lucide-react';
 
 interface AffiliateProductData {
   checkoutUrl: string;
@@ -38,6 +39,9 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onSubscribe, isModal 
   const [loading, setLoading] = useState(false);
   const isUpgradeOnly = typeof window !== 'undefined' ? localStorage.getItem('pricing_upgrade_only') === 'true' : false;
 
+  // 🔥 ESTADO DE CONSENTIMENTO
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+
   const monthlyPrice = affiliateData ? calcAffiliatePrice(BASE_MONTHLY, affiliateData.monthly) : BASE_MONTHLY;
   const annualPriceMonthlyEquivalent = affiliateData ? calcAffiliatePrice(BASE_ANNUAL, affiliateData.annual) : BASE_ANNUAL;
   const simuladoPrice = affiliateData ? calcAffiliatePrice(BASE_SIMULADO, affiliateData.simulado) : BASE_SIMULADO;
@@ -49,10 +53,24 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onSubscribe, isModal 
   const annualSavings = (monthlyPrice * 12) - annualTotal;
   const annualDiscountPct = Math.round((annualSavings / (monthlyPrice * 12)) * 100);
 
-  const handleCheckout = (plan?: 'annual' | 'monthly' | 'mock') => {
-    const KIWIFY_ANNUAL_URL = affiliateData?.annual.checkoutUrl || "https://pay.kiwify.com.br/XRDY3Pq"; // Plano Anual
-    const KIWIFY_MONTHLY_URL = affiliateData?.monthly.checkoutUrl || "https://pay.kiwify.com.br/RgS7hZy"; // Plano Mensal
-    const KIWIFY_MOCK_URL = affiliateData?.simulado.checkoutUrl || "https://pay.kiwify.com.br/FPVMgXp"; // Plano Simulado
+  // Corrigida a tipagem para incluir 'trial'
+  const handleCheckout = (plan?: 'annual' | 'monthly' | 'mock' | 'trial') => {
+    // Trava de segurança extra
+    if (!acceptedTerms) return;
+
+    if (plan === 'trial') {
+       const hostname = window.location.hostname;
+       if (hostname === 'www.studr.com.br' || hostname === 'studr.com.br') {
+         window.open('https://app.studr.com.br?mode=register', '_blank', 'noopener,noreferrer');
+       } else {
+         onSubscribe();
+       }
+       return;
+    }
+
+    const KIWIFY_ANNUAL_URL = affiliateData?.annual.checkoutUrl || "https://pay.kiwify.com.br/XRDY3Pq";
+    const KIWIFY_MONTHLY_URL = affiliateData?.monthly.checkoutUrl || "https://pay.kiwify.com.br/RgS7hZy";
+    const KIWIFY_MOCK_URL = affiliateData?.simulado.checkoutUrl || "https://pay.kiwify.com.br/FPVMgXp";
 
     let checkoutUrl = '';
     if (plan === 'mock') {
@@ -69,6 +87,22 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onSubscribe, isModal 
     localStorage.removeItem('pricing_upgrade_only');
     onBack();
   };
+
+  // Componente de Checkbox para reutilização nos cards
+  const ConsentCheckbox = () => (
+    <div className="flex items-start gap-2 mb-4 text-left">
+      <input
+        type="checkbox"
+        id="terms-consent"
+        checked={acceptedTerms}
+        onChange={(e) => setAcceptedTerms(e.target.checked)}
+        className="mt-1 w-4 h-4 rounded border-gray-300 dark:border-slate-600 text-enem-blue focus:ring-enem-blue cursor-pointer"
+      />
+      <label htmlFor="terms-consent" className="text-[11px] text-gray-500 dark:text-slate-400 cursor-pointer leading-tight">
+        Li e estou de acordo com os <a href="/politicas" target="_blank" className="text-enem-blue hover:underline font-bold">Termos de Uso</a> e <a href="/politicas" target="_blank" className="text-enem-blue hover:underline font-bold">Política de Privacidade</a>.
+      </label>
+    </div>
+  );
 
   return (
     <div className={`${isModal ? '' : 'min-h-screen'} bg-slate-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 font-sans transition-colors duration-300`}>
@@ -170,17 +204,21 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onSubscribe, isModal 
                 </div>
               )}
 
-              <p className={`text-gray-500 dark:text-slate-400 text-sm ${isModal ? 'mb-4' : 'mb-8'} min-h-[40px]`}>
+              <p className={`text-gray-500 dark:text-slate-400 text-sm ${isModal ? 'mb-4' : 'mb-6'} min-h-[40px]`}>
                 {billingCycle === 'monthly'
                   ? 'Perfeito para quem quer dar o primeiro passo.'
                   : 'Aqui é onde a mágica acontece.'}
               </p>
 
+              {/* Checkbox de Consentimento */}
+              <ConsentCheckbox />
+
               <Button
                 onClick={() => handleCheckout()}
                 loading={loading}
+                disabled={!acceptedTerms}
                 variant="primary"
-                className={`w-full ${isModal ? 'py-3 text-base' : 'py-4 text-lg'} bg-gradient-to-r from-enem-blue to-blue-600 hover:shadow-lg hover:scale-[1.02] transition-all font-black shadow-xl flex items-center justify-center gap-2`}
+                className={`w-full ${isModal ? 'py-3 text-base' : 'py-4 text-lg'} bg-gradient-to-r from-enem-blue to-blue-600 hover:shadow-lg hover:scale-[1.02] transition-all font-black shadow-xl flex items-center justify-center gap-2 ${!acceptedTerms ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 QUERO SER APROVADO
               </Button>
@@ -245,36 +283,49 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onSubscribe, isModal 
                   <span className="text-4xl font-extrabold text-gray-900 dark:text-white">{simuladoPrice.toFixed(2).replace('.', ',')}</span>
                   <span className="text-gray-400 dark:text-slate-500">/mês</span>
                 </div>
-                <p className="text-gray-500 dark:text-slate-400 text-sm mb-8 min-h-[40px]">
+                <p className="text-gray-500 dark:text-slate-400 text-sm mb-6 min-h-[40px]">
                   Foco total em performance. Faça 1 simulado oficial por mês com correção TRI.
                 </p>
 
-                <Button onClick={() => handleCheckout('mock')} variant="primary" className="w-full py-3 mb-8 bg-enem-yellow hover:bg-yellow-500 text-slate-900 font-bold">
+                {/* Checkbox de Consentimento */}
+                <ConsentCheckbox />
+
+                <Button 
+                  onClick={() => handleCheckout('mock')} 
+                  variant="primary" 
+                  disabled={!acceptedTerms}
+                  className={`w-full py-3 mb-8 bg-enem-yellow hover:bg-yellow-500 text-slate-900 font-bold ${!acceptedTerms ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
                   Assinar Simulado
                 </Button>
 
-                <ul className="space-y-4 text-sm text-gray-600 dark:text-slate-400">
-                  <li className="flex gap-3">
-                    <span className="text-enem-yellow dark:text-yellow-500 font-bold">✓</span>
-                    1 Simulado Completo (180q)/mês
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="text-enem-yellow dark:text-yellow-500 font-bold">✓</span>
-                    Cálculo Oficial TRI
-                  </li>
-                  <li className="flex gap-3 text-gray-400 dark:text-slate-600 line-through">
-                    <span className="text-gray-300 dark:text-slate-700">✖</span>
-                    Gerador de Questões IA
-                  </li>
-                  <li className="flex gap-3 text-gray-400 dark:text-slate-600 line-through">
-                    <span className="text-gray-300 dark:text-slate-700">✖</span>
-                    Correção de Redação IA
-                  </li>
-                  <li className="flex gap-3 text-gray-400 dark:text-slate-600 line-through">
-                    <span className="text-gray-300 dark:text-slate-700">✖</span>
-                    Tutor IA 24h
-                  </li>
-                </ul>
+                <ul className="space-y-4 text-sm text-gray-700 dark:text-slate-300">
+                <li className="flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-enem-yellow dark:text-yellow-500 flex-shrink-0" />
+                  <span className="font-semibold">1 Simulado Completo (180q)/mês</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-enem-yellow dark:text-yellow-500 flex-shrink-0" />
+                  <span className="font-semibold">Cálculo Oficial TRI</span>
+                </li>
+                
+                {/* Benefícios bloqueados, mas visíveis */}
+                <li className="flex items-center gap-3 text-gray-900 dark:text-slate-100 opacity-80">
+                  <Lock className="w-4 h-4 text-enem-blue dark:text-blue-400 flex-shrink-0" />
+                  <span>Gerador de Questões IA</span>
+                  <Badge className="ml-auto text-[10px] bg-blue-100 text-blue-700">Pro</Badge>
+                </li>
+                <li className="flex items-center gap-3 text-gray-900 dark:text-slate-100 opacity-80">
+                  <Lock className="w-4 h-4 text-enem-blue dark:text-blue-400 flex-shrink-0" />
+                  <span>Correção de Redação IA</span>
+                  <Badge className="ml-auto text-[10px] bg-blue-100 text-blue-700">Pro</Badge>
+                </li>
+                <li className="flex items-center gap-3 text-gray-900 dark:text-slate-100 opacity-80">
+                  <Lock className="w-4 h-4 text-enem-blue dark:text-blue-400 flex-shrink-0" />
+                  <span>Tutor IA 24h</span>
+                  <Badge className="ml-auto text-[10px] bg-blue-100 text-blue-700">Pro</Badge>
+                </li>
+              </ul>
               </div>
             </div>
           )}
@@ -288,23 +339,22 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onSubscribe, isModal 
                   <span className="text-4xl font-extrabold text-gray-900 dark:text-white">7 Dias</span>
                   <span className="text-gray-400 dark:text-slate-500">/trial</span>
                 </div>
-                <p className="text-gray-500 dark:text-slate-400 text-sm mb-8 min-h-[40px]">
+                <p className="text-gray-500 dark:text-slate-400 text-sm mb-6 min-h-[40px]">
                   Ideal para conhecer a plataforma e fazer revisões pontuais.
                 </p>
 
+                {/* Checkbox de Consentimento */}
+                <ConsentCheckbox />
+
                 <Button
                   type="button"
+                  disabled={!acceptedTerms}
                   onClick={(e: any) => {
                     e.stopPropagation();
-                    const hostname = window.location.hostname;
-                    if (hostname === 'www.studr.com.br' || hostname === 'studr.com.br') {
-                      window.open('https://app.studr.com.br?mode=register', '_blank', 'noopener,noreferrer');
-                    } else {
-                      onSubscribe();
-                    }
+                    handleCheckout('trial');
                   }}
                   variant="outline"
-                  className="w-full py-3 mb-8 border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white font-bold"
+                  className={`w-full py-3 mb-8 border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white font-bold ${!acceptedTerms ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   Começar Trial
                 </Button>
@@ -320,7 +370,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onSubscribe, isModal 
                   </li>
                   <li className="flex gap-3">
                     <span className="text-enem-blue dark:text-blue-400 font-bold">✓</span>
-                    Acesso aos Mapas de Estudo (Online)
+                    Acesso aos Mapas de Estudo (Limitado a 1/semana)
                   </li>
                   <li className="flex gap-3 text-gray-400 dark:text-slate-600 line-through">
                     <span className="text-gray-300 dark:text-slate-700">✖</span>

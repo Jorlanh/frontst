@@ -39,26 +39,27 @@ const BentoCard = ({
     {/* Grid Effect */}
     <div className="absolute inset-0 opacity-[0.04] dark:opacity-[0.06] bg-[linear-gradient(to_right,#64748b_1px,transparent_1px),linear-gradient(to_bottom,#64748b_1px,transparent_1px)] bg-[size:30px_30px]" />
 
-    {/* Locked */}
+    {/* EFEITO VITRINE (OVERLAY DE BLOQUEIO ALINHADO) */}
     {locked && (
-      <div className="absolute inset-0 z-30 backdrop-blur-md bg-white/70 dark:bg-black/60 flex flex-col items-center justify-center">
-        <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-xl mb-3">
-          <span className="text-3xl">🔒</span>
+      <div className="absolute inset-0 z-30 flex flex-col items-center justify-center transition-all duration-300 px-4">
+        <div className="flex flex-col items-center text-center transform transition-transform duration-300 group-hover:scale-105 w-full">
+          <div className="mb-2">
+            <span className="text-4xl drop-shadow-md">🔒</span>
+          </div>
+          <h3 className="text-lg md:text-xl font-black text-slate-800 dark:text-white drop-shadow-md leading-tight whitespace-normal">
+            Conteúdo Premium
+          </h3>
+          <p className="text-xs md:text-sm font-medium text-slate-600 dark:text-slate-300 mt-1 drop-shadow-sm">
+            Clique para desbloquear
+          </p>
         </div>
-
-        <h3 className="text-lg font-black text-slate-800 dark:text-white">
-          Conteúdo Premium
-        </h3>
-
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Clique para desbloquear
-        </p>
       </div>
     )}
 
+    {/* CONTEÚDO REAL DO CARD (Menos borrado e mais visível) */}
     <div
-      className={`relative z-10 h-full p-6 flex flex-col ${
-        locked ? 'opacity-30 blur-[2px]' : ''
+      className={`relative z-10 h-full p-6 flex flex-col transition-all duration-500 ${
+        locked ? 'opacity-70 blur-[2px] pointer-events-none select-none' : ''
       }`}
     >
       {children}
@@ -112,9 +113,10 @@ export default function HomeView() {
   const { navigate, view } = useNavigation(); 
   const { openPricing, setChatOpen } = useUI();
 
-  const isPremium = user?.isPremium;
-  const isMockOnly = user?.subscriptionStatus === 'MOCK_ONLY';
+  // 🔥 SINCRONIZAÇÃO DE PERMISSÕES COM O BACKEND
   const isAdmin = user?.role === 'ADMIN';
+  const isSimuladoPlan = user?.subscriptionStatus === 'SIMULADO' || user?.subscriptionStatus === 'MOCK_ONLY';
+  const hasFullAccess = isAdmin || (user?.isPremium && !isSimuladoPlan) || isTrial;
   
   // Controle de estado para o Modal das Regras da Torre
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
@@ -189,7 +191,7 @@ export default function HomeView() {
               A única plataforma inteligente que calibra seus estudos com a verdadeira Teoria de Resposta ao Item (TRI).
             </p>
 
-            {isMockOnly && (
+            {isSimuladoPlan && (
               <Badge
                 color="yellow"
                 className="mt-6 px-5 py-2 rounded-full"
@@ -234,7 +236,7 @@ export default function HomeView() {
       {/* ========================================= */}
       <BentoCard
         className="md:col-span-12 min-h-[300px]"
-        locked={!(isPremium || isTrial)}
+        locked={!hasFullAccess}
         onLockedClick={openPricing}
       >
         <div className="absolute top-0 right-0 w-72 h-72 bg-blue-500/10 blur-3xl rounded-full" />
@@ -346,7 +348,7 @@ export default function HomeView() {
       {/* ========================================= */}
       <BentoCard
         className="md:col-span-8 min-h-[260px]"
-        locked={!(isPremium || isMockOnly || isTrial)}
+        locked={!(hasFullAccess || isSimuladoPlan)}
         onLockedClick={openPricing}
       >
         <div className="flex items-start justify-between mb-5">
@@ -383,7 +385,7 @@ export default function HomeView() {
               key={area.id}
               disabled={
                 mockLoading ||
-                (isMockOnly && hasTakenMockThisMonth())
+                (isSimuladoPlan && hasTakenMockThisMonth())
               }
               onClick={() =>
                 startSimulado('AREA', area.id)
@@ -410,7 +412,7 @@ export default function HomeView() {
             onClick={() => startSimulado('FULL')}
             disabled={
               mockLoading ||
-              (isMockOnly && hasTakenMockThisMonth())
+              (isSimuladoPlan && hasTakenMockThisMonth())
             }
             className="
             flex-1
@@ -442,7 +444,7 @@ export default function HomeView() {
       {/* ========================================= */}
       <BentoCard
         className="md:col-span-4 min-h-[260px]"
-        locked={!isPremium}
+        locked={!hasFullAccess}
         onLockedClick={openPricing}
       >
         <div className="flex flex-col h-full">
@@ -490,7 +492,7 @@ export default function HomeView() {
       {/* ========================================= */}
       <BentoCard
         className="md:col-span-4 min-h-[240px]"
-        locked={!isPremium}
+        locked={!hasFullAccess}
         onLockedClick={openPricing}
       >
         <div className="flex items-center gap-4 mb-4">
@@ -541,7 +543,7 @@ export default function HomeView() {
       {/* ========================================= */}
       <BentoCard
         className="md:col-span-4 min-h-[240px]"
-        locked={!(isPremium || isTrial)}
+        locked={!hasFullAccess}
         onLockedClick={openPricing}
       >
         <div className="flex items-start justify-between mb-4">
@@ -600,7 +602,7 @@ export default function HomeView() {
       {/* ========================================= */}
       <BentoCard
         className="md:col-span-2 min-h-[240px]"
-        locked={!(isPremium || isTrial)}
+        locked={!hasFullAccess}
         onLockedClick={openPricing}
       >
         <div className="flex flex-col items-center justify-center h-full">
@@ -633,7 +635,7 @@ export default function HomeView() {
       {/* ========================================= */}
       <BentoCard
         className="md:col-span-2 min-h-[240px]"
-        locked={!(isPremium || isTrial)}
+        locked={!hasFullAccess}
         onLockedClick={openPricing}
       >
         <div className="flex flex-col items-center justify-center h-full text-center">
