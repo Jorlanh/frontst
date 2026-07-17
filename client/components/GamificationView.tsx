@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { fetchGamificationState, ServerGamificationState, GamProgress, GamBadge } from '../services/gamification';
+import React, { useState, useEffect, createContext, useContext, useCallback, PropsWithChildren } from 'react';
+import { fetchGamificationState, ServerGamificationState, GamProgress, GamBadge, emitGamificationEvent } from '../services/gamification';
 import { apiRequest } from '../services/apiService';
 import { Card, Button, LoadingSpinner } from './UIComponents';
-import { AreaOfKnowledge } from '../types';
+import { AreaOfKnowledge, AppView } from '../types';
+import { useUser } from '../contexts/UserContext';
+import { useUI } from '../contexts/UIContext';
+import { useNavigation } from '../contexts/NavigationContext';
 
 interface GamificationViewProps {
   onBack: () => void;
-  // 🔥 Ajustado: Aceita areaId e subTopic opcionalmente, e a flag isReviewMode
   onReviewErrors: (areaId?: string, subTopic?: string, isReviewMode?: boolean) => void;
   isLoading?: boolean;
 }
@@ -125,6 +127,19 @@ const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErr
 
     const league = ranking.league;
 
+    // 🔥 MOTOR DE AUTO-ORDENAÇÃO: Garante o ranking correto baseado no XP absoluto, mesmo se o backend falhar
+    const sortedEntries = [...ranking.entries].sort((a, b) => {
+      if (b.weeklyXp !== a.weeklyXp) return b.weeklyXp - a.weeklyXp; // Ordena por XP
+      if (b.level !== a.level) return b.level - a.level; // Desempate 1: Nível
+      return a.name.localeCompare(b.name); // Desempate 2: Ordem Alfabética
+    }).map((entry, index) => ({
+      ...entry,
+      rank: index + 1 // Recalcula a posição oficial
+    }));
+
+    // Recalcula a sua posição real na liga
+    const myCorrectedPosition = sortedEntries.find(e => e.isMe)?.rank || ranking.myPosition;
+
     return (
       <div className="space-y-4 animate-fade-in">
         {/* League banner */}
@@ -136,7 +151,7 @@ const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErr
                 {LEAGUE_ICON[league]} Liga {LEAGUE_LABEL[league] ?? league}
               </h3>
               <p className="text-white/70 text-sm mt-1">
-                {ranking.totalInLeague} alunos • sua posição: <strong className="text-white">#{ranking.myPosition}</strong>
+                {ranking.totalInLeague} alunos • sua posição: <strong className="text-white">#{myCorrectedPosition}</strong>
               </p>
             </div>
             <div className="text-6xl opacity-30">{LEAGUE_ICON[league]}</div>
@@ -151,7 +166,7 @@ const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErr
             <div className="col-span-2 text-center">XP Semanal</div>
             <div className="col-span-2 text-center">Nível</div>
           </div>
-          {ranking.entries.map((entry) => (
+          {sortedEntries.map((entry) => (
             <div
               key={`${entry.rank}-${entry.name}`}
               className={`grid grid-cols-12 gap-2 p-4 items-center border-b border-gray-100 dark:border-slate-800 last:border-0 transition-colors
@@ -161,22 +176,22 @@ const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErr
             >
               <div className="col-span-2 flex justify-center">
                 <div className={`w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm
-                  ${entry.rank === 1 ? 'bg-yellow-400 text-yellow-900'
-                  : entry.rank === 2 ? 'bg-gray-300 text-gray-800'
-                  : entry.rank === 3 ? 'bg-orange-300 text-orange-900'
+                  ${entry.rank === 1 ? 'bg-yellow-400 text-yellow-900 shadow-md'
+                  : entry.rank === 2 ? 'bg-gray-300 text-gray-800 shadow-md'
+                  : entry.rank === 3 ? 'bg-orange-300 text-orange-900 shadow-md'
                   : 'bg-slate-100 dark:bg-slate-800 text-gray-500'}`}>
                   {entry.rank}
                 </div>
               </div>
               <div className="col-span-6 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-sm font-bold text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-sm font-bold text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shadow-sm">
                   {entry.name.charAt(0).toUpperCase()}
                 </div>
-                <span className={`font-bold text-sm ${entry.isMe ? 'text-enem-blue' : 'text-gray-800 dark:text-slate-100'}`}>
+                <span className={`font-bold text-sm truncate ${entry.isMe ? 'text-enem-blue dark:text-blue-400' : 'text-gray-800 dark:text-slate-100'}`}>
                   {entry.name}{entry.isMe && ' (Eu)'}
                 </span>
               </div>
-              <div className="col-span-2 text-center font-mono font-bold text-gray-700 dark:text-slate-300">
+              <div className={`col-span-2 text-center font-mono font-bold ${entry.weeklyXp > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-slate-600'}`}>
                 {entry.weeklyXp}
               </div>
               <div className="col-span-2 text-center">
@@ -186,7 +201,7 @@ const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErr
               </div>
             </div>
           ))}
-          {ranking.entries.length === 0 && (
+          {sortedEntries.length === 0 && (
             <div className="p-8 text-center text-gray-400 dark:text-slate-500 text-sm">
               Nenhum aluno na sua liga ainda. Seja o primeiro! 🚀
             </div>
@@ -478,3 +493,70 @@ const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErr
 };
 
 export default GamificationView;
+
+// ==========================================
+// 🛡️ CONTEXTO DE GAMIFICAÇÃO
+// ==========================================
+interface GamificationContextValue {
+  navLevel: number;
+  navXp: number;
+  navXpPercent: number;
+  fireGamificationEvent: (eventType: string, payload?: Record<string, unknown>) => void;
+}
+
+const GamificationContext = createContext<GamificationContextValue | null>(null);
+
+export function GamificationProvider({ children }: PropsWithChildren) {
+  const { user } = useUser();
+  const { view } = useNavigation();
+  const { showNotification } = useUI();
+  const [navLevel, setNavLevel] = useState(1);
+  const [navXp, setNavXp] = useState(0);
+  const [navXpPercent, setNavXpPercent] = useState(0);
+
+  // Load gamification state when user logs in
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchGamificationState()
+      .then(state => {
+        setNavLevel(state.xp.level);
+        setNavXp(state.xp.totalXp);
+        const cur = state.currentLevelXp ?? 0;
+        const next = state.nextLevelXp;
+        if (next && next > cur) {
+          setNavXpPercent(Math.min(100, Math.round(((state.xp.totalXp - cur) / (next - cur)) * 100)));
+        }
+      })
+      .catch(() => {}); // non-critical
+  }, [user?.id]);
+
+  const fireGamificationEvent = useCallback((eventType: string, payload: Record<string, unknown> = {}) => {
+    // Silence badge toasts during simulado to avoid distraction
+    const silent = view === AppView.MOCK_EXAM;
+
+    emitGamificationEvent(eventType, payload)
+      .then(result => {
+        setNavLevel(result.level);
+        setNavXp(result.totalXp);
+        if (result.leveledUp && !silent) {
+          showNotification(`🚀 LEVEL UP! Você alcançou o Nível ${result.level}!`);
+        } else if (!silent && result.newBadges.length > 0) {
+          const badge = result.newBadges[0];
+          showNotification(`${badge.iconEmoji ?? '🎖️'} Nova conquista: ${badge.title}`);
+        }
+      })
+      .catch(err => console.warn('[gamification] Evento falhou (não-crítico):', err?.message));
+  }, [view, showNotification]);
+
+  return (
+    <GamificationContext.Provider value={{ navLevel, navXp, navXpPercent, fireGamificationEvent }}>
+      {children}
+    </GamificationContext.Provider>
+  );
+}
+
+export function useGamification() {
+  const ctx = useContext(GamificationContext);
+  if (!ctx) throw new Error('useGamification must be used inside GamificationProvider');
+  return ctx;
+}

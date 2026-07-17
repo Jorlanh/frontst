@@ -6,7 +6,7 @@ import { usePractice } from '../contexts/PracticeContext';
 import { useMock } from '../contexts/MockContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useUI } from '../contexts/UIContext';
-import { Button, Badge } from './UIComponents';
+import { Button, Badge, Modal } from './UIComponents';
 import Logo from './Logo';
 import { SUBJECT_AREAS, SPECIFIC_SUBJECTS } from '../constants';
 import TowerRulesModal from './TowerRulesModal';
@@ -108,7 +108,7 @@ export default function HomeView() {
     setSpecificTopicInput
   } = usePractice();
 
-  const { startSimulado, loading: mockLoading } = useMock();
+  const mock = useMock();
 
   const { navigate, view } = useNavigation(); 
   const { openPricing, setChatOpen } = useUI();
@@ -120,6 +120,10 @@ export default function HomeView() {
   
   // Controle de estado para o Modal das Regras da Torre
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
+
+  // Estados adicionados para a interceptação de configuração pré-prova do simulado oficial
+  const [isFullMockModalOpen, setIsFullMockModalOpen] = useState(false);
+  const [chosenLanguage, setChosenLanguage] = useState<'Inglês' | 'Espanhol'>('Inglês');
 
   const hasTakenMockThisMonth = () => {
     if (!user?.id) return false;
@@ -147,7 +151,7 @@ export default function HomeView() {
       navigate(AppView.ESSAY);
     } else {
       const qCount = floor.questionsCount || 5;
-      startSimulado('AREA', floor.area || AreaOfKnowledge.MIXED, { towerQuestionsCount: qCount });
+      mock.startSimulado('AREA', floor.area || AreaOfKnowledge.MIXED, { towerQuestionsCount: qCount });
     }
   };
 
@@ -285,7 +289,7 @@ export default function HomeView() {
                 focus:ring-2
                 focus:ring-blue-500
                 shadow-inner
-              "
+                "
               />
 
               <Button
@@ -306,7 +310,7 @@ export default function HomeView() {
                 to-cyan-500
                 hover:scale-[1.02]
                 shadow-[0_10px_30px_rgba(59,130,246,0.35)]
-              "
+                "
               >
                 🚀 Gerar Questões
               </Button>
@@ -322,17 +326,17 @@ export default function HomeView() {
                   disabled={practiceLoading}
                   onClick={() => startPractice(subject.area, subject.name)}
                   className="
-                    p-3
-                    rounded-2xl
-                    text-xs
-                    font-bold
-                    border
-                    border-slate-200 dark:border-slate-700
-                    bg-white/60 dark:bg-slate-800/60
-                    backdrop-blur-xl
-                    hover:border-blue-400
-                    hover:-translate-y-1
-                    transition-all
+                  p-3
+                  rounded-2xl
+                  text-xs
+                  font-bold
+                  border
+                  border-slate-200 dark:border-slate-700
+                  bg-white/60 dark:bg-slate-800/60
+                  backdrop-blur-xl
+                  hover:border-blue-400
+                  hover:-translate-y-1
+                  transition-all
                   "
                 >
                   {subject.name}
@@ -384,11 +388,11 @@ export default function HomeView() {
             <button
               key={area.id}
               disabled={
-                mockLoading ||
+                mock.loading ||
                 (isSimuladoPlan && hasTakenMockThisMonth())
               }
               onClick={() =>
-                startSimulado('AREA', area.id)
+                mock.startSimulado('AREA', area.id)
               }
               className="
               h-12
@@ -400,7 +404,7 @@ export default function HomeView() {
               font-bold
               hover:border-blue-400
               transition-all
-            "
+              "
             >
               {area.name}
             </button>
@@ -409,9 +413,9 @@ export default function HomeView() {
 
         <div className="flex flex-col md:flex-row gap-3">
           <Button
-            onClick={() => startSimulado('FULL')}
+            onClick={() => setIsFullMockModalOpen(true)}
             disabled={
-              mockLoading ||
+              mock.loading ||
               (isSimuladoPlan && hasTakenMockThisMonth())
             }
             className="
@@ -422,9 +426,9 @@ export default function HomeView() {
             bg-gradient-to-r
             from-blue-600
             to-indigo-500
-          "
+            "
           >
-            {mockLoading
+            {mock.loading
               ? 'Calibrando IA...'
               : '🏆 Iniciar Simulado Completo'}
           </Button>
@@ -455,7 +459,7 @@ export default function HomeView() {
 
             <div>
               <h2 className="text-2xl font-black text-slate-900 dark:text-white">
-                Tutor IA
+                Enelsom: Seu Tutor IA
               </h2>
 
               <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -480,7 +484,7 @@ export default function HomeView() {
             bg-gradient-to-r
             from-violet-600
             to-fuchsia-500
-          "
+            "
           >
             Abrir Tutor
           </Button>
@@ -521,7 +525,7 @@ export default function HomeView() {
             bg-gradient-to-r
             from-pink-500
             to-rose-500
-          "
+            "
           >
             Nova Redação
           </Button>
@@ -585,7 +589,7 @@ export default function HomeView() {
           bg-gradient-to-r
           from-cyan-500
           to-blue-600
-        "
+          "
         >
           ⚔️ Iniciar Jornada
         </Button>
@@ -661,7 +665,7 @@ export default function HomeView() {
             bg-gradient-to-r
             from-emerald-500
             to-teal-500
-          "
+            "
           >
             Abrir
           </Button>
@@ -669,6 +673,54 @@ export default function HomeView() {
       </BentoCard>
     </div>
       </div>
+
+      {/* 🔥 CONFIGURAÇÃO PRÉ-PROVA DO CADERNO OFICIAL 180 QUESTÕES */}
+      <Modal 
+        isOpen={isFullMockModalOpen} 
+        onClose={() => setIsFullMockModalOpen(false)} 
+        title="Caderno Oficial ENEM 180 Questões"
+      >
+        <div className="space-y-5 p-1">
+          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+            Selecione o idioma estrangeiro obrigatório para o processamento do primeiro bloco (Questões 1 a 5). A prova seguirá o edital oficial de 2 dias.
+          </p>
+          
+          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Língua Estrangeira (Dia 1)</label>
+            <select
+              value={chosenLanguage}
+              onChange={(e) => setChosenLanguage(e.target.value as any)}
+              className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-xl font-bold outline-none text-slate-800 dark:text-slate-200"
+            >
+              <option value="Inglês">🇺🇸 Inglês (5 questões)</option>
+              <option value="Espanhol">🇪🇸 Espanhol (5 questões)</option>
+            </select>
+          </div>
+
+          <div className="text-[11px] space-y-2 bg-blue-500/5 p-4 rounded-xl text-slate-500 border border-blue-500/10 font-medium">
+            <div className="flex justify-between items-center border-b border-blue-500/10 pb-2">
+              <span className="uppercase tracking-widest font-black text-slate-700 dark:text-slate-300">Dia 1: Humanas, Linguagens, Redação</span>
+              <Badge color="blue">5h 30m</Badge>
+            </div>
+            <div className="flex justify-between items-center pt-1">
+              <span className="uppercase tracking-widest font-black text-slate-700 dark:text-slate-300">Dia 2: Natureza e Exatas</span>
+              <Badge color="blue">5h 00m</Badge>
+            </div>
+          </div>
+
+          <Button
+            onClick={() => {
+              setIsFullMockModalOpen(false);
+              mock.startSimulado('FULL', undefined, { language: chosenLanguage });
+            }}
+            className="w-full py-4 font-black uppercase tracking-widest mt-2 shadow-xl bg-enem-blue"
+            variant="primary"
+          >
+            🔥 Iniciar Primeiro Dia
+          </Button>
+        </div>
+      </Modal>
+
     </div>
   );
 }

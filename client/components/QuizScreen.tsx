@@ -96,10 +96,16 @@ export default function QuizScreen() {
           setIsFinalizing(false); 
       } else {
           isMock ? await mock.handleNext() : await practice.handleNext();
+          // 🔥 Auto-scroll suave para o topo da página após carregar nova questão
+          window.scrollTo({ top: 0, behavior: 'smooth' });
       }
   };
 
-  const handlePrevious = isMock ? mock.handlePrevious : practice.handlePrevious;
+  // 🔥 Auto-scroll suave também para o botão de "Anterior"
+  const handlePrevious = () => {
+      isMock ? mock.handlePrevious() : practice.handlePrevious();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   
   const cancelAction = () => {
     if (isTowerMode) {
@@ -116,16 +122,7 @@ export default function QuizScreen() {
   const isTimeUp = mock.isTimeUp;
   const simuladoTargetCount = mock.simuladoTargetCount;
   const formatTimeFn = mock.formatTime;
-
-  const currentQ = questions[currentQuestionIndex];
-  const hasAnswered = userAnswers[currentQ?.id] !== undefined;
-  const isLastLoaded = currentQuestionIndex === questions.length - 1;
-  const isSimuladoOrTowerFinished = isMock 
-      ? (currentQuestionIndex + 1 >= simuladoTargetCount || isTimeUp)
-      : (isTowerMode && currentQuestionIndex + 1 >= towerTargetCount);
-
-  const effectiveTargetCount = isMock ? simuladoTargetCount : (isTowerMode ? towerTargetCount : '∞');
-  const sessionHeaderTitle = isMock ? 'Simulado ENEM' : (isTowerMode ? `Batalha: Prédio ${towerLevel}` : 'Modo Prática Infinita');
+  const examPhase = mock.examPhase;
 
   // 🔥 MAPEAMENTO DE COR E TEXTO REAL DA DIFICULDADE
   const getDifficultyColor = (diff: string) => {
@@ -141,6 +138,215 @@ export default function QuizScreen() {
     if (d === 'HARD' || d === 'DIFÍCIL' || d === 'DIFICIL') return 'Difícil';
     return 'Média';
   };
+
+  // =========================================================================================
+  // ✍️ TELA DE REDAÇÃO (DIA 1) - IDENTICA AO DESIGN ENVIADO (COM AS 5 COMPETÊNCIAS)
+  // =========================================================================================
+  if (isMock && examPhase === 'REDACAO_INTERVAL') {
+    const APPROX_WORDS_PER_LINE = 10;
+    const MIN_PALAVRAS = 80;
+    const MIN_LINHAS = 7;
+    const MAX_LINHAS = 30;
+
+    const wordCount = mock.redacaoText.trim().split(/\s+/).filter(w => w.length > 0).length;
+    const estimatedLines = Math.ceil(wordCount / APPROX_WORDS_PER_LINE);
+    const canSubmit = wordCount >= MIN_PALAVRAS && estimatedLines >= MIN_LINHAS;
+
+    const maxTime = 19800; // 5h30m (base do Dia 1)
+    const percentageLeft = maxTime > 0 ? (timeRemaining / maxTime) * 100 : 100;
+    const isAlertPhase = percentageLeft <= 15 && percentageLeft > 5;
+    const isCriticalPhase = percentageLeft <= 5 && timeRemaining > 60;
+    const isFinalBattle = timeRemaining <= 60 && timeRemaining > 0 && maxTime > 0;
+
+    let hudBorderClass = "border-slate-200 dark:border-slate-700";
+    let hudTextClass = "text-slate-500 dark:text-slate-400";
+    let textShadow = "";
+    
+    if (isAlertPhase) {
+      hudBorderClass = "border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.1)]";
+      hudTextClass = "text-yellow-600 dark:text-yellow-500 font-bold";
+    } else if (isCriticalPhase) {
+      hudBorderClass = "border-red-500/80 shadow-[0_0_30px_rgba(239,68,68,0.2)] animate-pulse";
+      hudTextClass = "text-red-600 dark:text-red-500 font-black animate-pulse";
+    } else if (isFinalBattle) {
+      hudBorderClass = "border-red-600 bg-red-950/10 shadow-[0_0_50px_rgba(239,68,68,0.5)]";
+      hudTextClass = "text-red-600 text-lg font-black animate-ping";
+      textShadow = "drop-shadow-[0_0_8px_rgba(239,68,68,0.8)] text-red-50";
+    }
+
+    const competences = [
+      { id: 1, name: "Domínio da Norma Padrão", desc: "Demonstrar domínio da modalidade escrita formal da Língua Portuguesa." },
+      { id: 2, name: "Compreensão e Repertório", desc: "Compreender a proposta e aplicar conceitos das várias áreas de conhecimento." },
+      { id: 3, name: "Organização e Argumentação", desc: "Selecionar, relacionar, organizar e interpretar informações em defesa de um ponto de vista." },
+      { id: 4, name: "Coesão e Conectivos", desc: "Demonstrar conhecimento dos mecanismos linguísticos necessários para a argumentação." },
+      { id: 5, name: "Proposta de Intervenção", desc: "Elaborar proposta de intervenção para o problema respeitando os direitos humanos." }
+    ];
+
+    const mockTheme = "A precarização do trabalho e o desafio da dignidade na era dos aplicativos no Brasil";
+    const motivatingTexts = [
+      "Estudos recentes do IBGE indicam que milhões de brasileiros dependem de plataformas digitais para sua subsistência, atuando como entregadores, motoristas ou prestadores de serviços. Essa modalidade, muitas vezes celebrada pela flexibilidade, esconde uma ausência de direitos trabalhistas básicos, como férias remuneradas, 13º salário e acesso à Previdência Social, gerando grande insegurança.",
+      "A Constituição Federal de 1988 estabelece a dignidade da pessoa humana como um dos fundamentos da República, um princípio que se estende ao campo do trabalho. Contudo, a lógica das plataformas digitais levanta questões sobre a autonomia do trabalhador e a garantia de condições mínimas para uma vida digna.",
+      "Notícias frequentes revelam mobilizações de trabalhadores de aplicativos em diversas capitais brasileiras, que reivindicam melhores condições de trabalho, remuneração justa e o reconhecimento de um vínculo empregatício. A ausência de regulamentação clara perpetua um ciclo de vulnerabilidade econômica."
+    ];
+
+    const handleAdvanceToDay2 = () => {
+      if (!canSubmit) {
+        alert(`Atenção: Sua redação precisa ter no mínimo ${MIN_PALAVRAS} palavras e pelo menos ${MIN_LINHAS} linhas estimadas.`);
+        return;
+      }
+      mock.startDay2();
+      // 🔥 Auto-scroll suave após avançar de dia
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    return (
+      <div className="max-w-7xl mx-auto p-3 sm:p-6 animate-fade-in">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl sm:text-3xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <span className="text-enem-blue">📝</span> Redação Oficial ENEM (Dia 1)
+            </h1>
+          </div>
+          <div className="hidden sm:flex items-center gap-3">
+            <Badge color="blue">Padrão ENEM 2026</Badge>
+            <Badge color="green">Tecnologia STUDR Pro</Badge>
+          </div>
+        </div>
+
+        <div className="grid lg:grid-cols-12 gap-8 lg:items-start animate-fade-in">
+          {/* Coluna da Esquerda: Tema e Textos Motivadores */}
+          <div className="lg:col-span-4 space-y-6 sticky top-24">
+            <div className="bg-gradient-to-br from-enem-blue to-blue-800 p-6 rounded-2xl text-white shadow-xl shadow-blue-500/10 border border-blue-400/20">
+              <h3 className="text-[10px] font-black uppercase mb-3 tracking-[0.2em] opacity-80 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                Tema Proposto
+              </h3>
+              <p className="text-lg font-extrabold leading-tight">{mockTheme}</p>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Textos Motivadores</h4>
+                <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">{motivatingTexts.length} fragmentos</span>
+              </div>
+              
+              <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                {motivatingTexts.map((text, i) => (
+                  <div key={i} className="bg-white dark:bg-slate-900/50 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/80 text-sm text-slate-600 dark:text-slate-300 shadow-sm leading-relaxed relative group hover:border-enem-blue/30 transition-all">
+                    <span className="absolute -left-2 top-4 w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-400 group-hover:bg-enem-blue group-hover:text-white transition-colors">{i + 1}</span>
+                    <div className="pl-4">{text}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Bloco Explicativo das 5 Competências INEP */}
+              <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-4">As 5 Competências Avaliadas</h4>
+                <div className="space-y-2">
+                  {competences.map((comp) => (
+                    <div key={comp.id} className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
+                      <strong className="text-slate-700 dark:text-slate-300">Competência {comp.id}:</strong> {comp.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Coluna Principal: Área de Escrita */}
+          <div className="lg:col-span-8 flex flex-col">
+            <div className={`bg-slate-50 dark:bg-slate-800/80 rounded-t-2xl border border-b-0 p-4 flex justify-between items-center text-xs font-bold shadow-sm transition-colors ${hudBorderClass} ${hudTextClass}`}>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-full border dark:border-slate-700">
+                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                  <span className="uppercase tracking-tighter">Folha Oficial Ativa</span>
+                </div>
+                <div className="hidden sm:flex items-center gap-3 opacity-60">
+                   <span>Foco Total: ON</span>
+                   <span className="h-4 w-px bg-slate-200 dark:bg-slate-700"></span>
+                   <span className={isTimeUp ? 'text-red-500 font-black' : ''}>⏱ {formatTimeFn(timeRemaining)}</span>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <span className={wordCount < MIN_PALAVRAS ? 'text-amber-500' : 'text-green-500'}>{wordCount} / {MIN_PALAVRAS} palavras</span>
+                <span className={`bg-slate-200/50 dark:bg-slate-700 px-2 py-0.5 rounded ${estimatedLines >= MIN_LINHAS && estimatedLines <= MAX_LINHAS ? 'text-green-500' : 'text-amber-500'}`}>~{estimatedLines} linhas</span>
+              </div>
+            </div>
+
+            <div className="relative group">
+               <div className="absolute left-0 top-0 bottom-0 w-3 bg-red-400/20 dark:bg-red-500/10 pointer-events-none z-10 rounded-bl-2xl"></div>
+               <textarea
+                className={`w-full flex-1 min-h-[70vh] pl-8 pr-8 py-8 border rounded-b-2xl focus:ring-8 focus:outline-none resize-none font-serif text-lg md:text-xl leading-[2.1] text-slate-800 dark:text-slate-100 shadow-2xl transition-all custom-scrollbar ${hudBorderClass} ${textShadow} ${isTimeUp ? 'bg-slate-50 dark:bg-slate-800/50 cursor-not-allowed opacity-60' : 'bg-white dark:bg-slate-900 focus:ring-enem-blue/5'}`}
+                placeholder="Inicie sua introdução respeitando a estrutura dissertativo-argumentativa..."
+                value={mock.redacaoText}
+                onChange={(e) => mock.setRedacaoText(e.target.value)}
+                disabled={isTimeUp}
+                autoFocus
+              />
+            </div>
+
+            {/* Painel de Validação e Transição de Dia */}
+            <div className="mt-6 flex flex-col md:flex-row gap-4 items-end justify-between bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+               <div className="flex flex-col gap-1 w-full md:w-auto">
+                  {(!canSubmit || estimatedLines > MAX_LINHAS) ? (
+                      <>
+                          {wordCount < MIN_PALAVRAS && (
+                              <p className="text-xs text-amber-600 dark:text-amber-400 font-bold">⚠️ Faltam {MIN_PALAVRAS - wordCount} palavras para o mínimo exigido.</p>
+                          )}
+                          {estimatedLines < MIN_LINHAS && wordCount >= MIN_PALAVRAS && (
+                              <p className="text-xs text-amber-600 dark:text-amber-400 font-bold">⚠️ O texto está muito curto. Escreva pelo menos {MIN_LINHAS} linhas.</p>
+                          )}
+                          {estimatedLines > MAX_LINHAS && (
+                              <p className="text-xs text-rose-600 dark:text-rose-400 font-bold">❌ Atenção: Redação estourou as {MAX_LINHAS} linhas! Reduza seu texto.</p>
+                          )}
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-medium">
+                              Metas: Mín. {MIN_PALAVRAS} palavras ({wordCount}/{MIN_PALAVRAS}) | {MIN_LINHAS} a {MAX_LINHAS} linhas ({estimatedLines})
+                          </p>
+                      </>
+                  ) : (
+                      <div className="flex items-center gap-2">
+                         <span className="text-xl">✅</span>
+                         <div>
+                            <p className="text-sm font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Estrutura Válida</p>
+                            <p className="text-[10px] text-slate-400 font-medium">Limites oficiais do INEP respeitados.</p>
+                         </div>
+                      </div>
+                  )}
+               </div>
+
+               <Button 
+                  onClick={handleAdvanceToDay2} 
+                  disabled={!canSubmit || estimatedLines > MAX_LINHAS} 
+                  className={`w-full md:w-auto py-4 px-8 font-black uppercase tracking-widest shadow-xl transition-all ${(canSubmit && estimatedLines <= MAX_LINHAS) ? 'bg-enem-blue hover:scale-105 shadow-blue-500/30 text-white' : 'bg-slate-300 text-slate-500 dark:bg-slate-700 dark:text-slate-400 cursor-not-allowed opacity-80'}`}
+               >
+                  Iniciar Dia 2 (Exatas/Natureza) →
+               </Button>
+            </div>
+
+            <div className="mt-4 text-center">
+              <Button variant="outline" className="text-xs font-bold text-slate-500" onClick={mock.cancelMock}>
+                Pausar Simulado e Sair
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================================
+  // RENDERIZAÇÃO PADRÃO DAS QUESTÕES
+  // =========================================================================================
+  const currentQ = questions[currentQuestionIndex];
+  const hasAnswered = userAnswers[currentQ?.id] !== undefined;
+  const isLastLoaded = currentQuestionIndex === questions.length - 1;
+  const isSimuladoOrTowerFinished = isMock 
+      ? (currentQuestionIndex + 1 >= simuladoTargetCount || isTimeUp)
+      : (isTowerMode && currentQuestionIndex + 1 >= towerTargetCount);
+
+  const effectiveTargetCount = isMock ? simuladoTargetCount : (isTowerMode ? towerTargetCount : '∞');
+  const sessionHeaderTitle = isMock ? (mock.simuladoMode === 'FULL' ? (examPhase === 'DAY1' ? 'ENEM Oficial - 1º Dia' : 'ENEM Oficial - 2º Dia') : 'Simulado por Área') : (isTowerMode ? `Batalha: Prédio ${towerLevel}` : 'Modo Prática Infinita');
 
   return (
     <div className="max-w-4xl mx-auto pt-6 px-4 pb-24">
@@ -207,7 +413,6 @@ export default function QuizScreen() {
               <Badge color={isTowerMode ? "purple" : "blue"} className="shadow-sm">
                 {currentQ.area}
               </Badge>
-              {/* 🔥 EXIBIÇÃO DA ETANQUETA CORRIGIDA DE ACORDO COM O BANCO */}
               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${getDifficultyColor(currentQ.difficulty)}`}>
                  {getDifficultyLabel(currentQ.difficulty)}
               </span>

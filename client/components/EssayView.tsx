@@ -164,6 +164,11 @@ const EssayView: React.FC<EssayViewProps> = ({ onBack, onSuccess }) => {
       const example = await getGrade1000Example(theme.title);
       setExample1000(example);
       setViewingExample(true);
+      
+      // Auto-scroll suave para o modelo após carregar
+      setTimeout(() => {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }, 100);
     } catch (e) {
       alert("Erro ao carregar exemplo.");
     } finally {
@@ -485,14 +490,18 @@ const EssayView: React.FC<EssayViewProps> = ({ onBack, onSuccess }) => {
         </div>
       )}
 
+      {/* 🔥 AQUI ESTÁ A CORREÇÃO: ADICIONADO ESPAÇAMENTO PARA NÃO GRUDAR NA INTERFACE ACIMA */}
       {viewingExample && example1000 && (
-        <div className="max-w-5xl mx-auto space-y-8 animate-fade-in pb-20">
+        <div className="max-w-5xl mx-auto space-y-8 animate-fade-in pb-20 mt-24 pt-12 border-t border-slate-200 dark:border-slate-800/50">
           <div className="flex justify-between items-center border-b dark:border-slate-800 pb-6">
              <div>
                 <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100">Modelo de Redação Nota 1000</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-500">Analise a estrutura vencedora para o tema: <span className="font-bold text-enem-blue">"{theme?.title}"</span></p>
              </div>
-             <Button variant="outline" size="sm" onClick={() => setViewingExample(false)} className="px-6 border-slate-200 dark:border-slate-800">Voltar para Análise</Button>
+             <Button variant="outline" size="sm" onClick={() => {
+               setViewingExample(false);
+               window.scrollTo({ top: 0, behavior: 'smooth' });
+             }} className="px-6 border-slate-200 dark:border-slate-800">Fechar Análise</Button>
           </div>
 
           <div className="grid lg:grid-cols-12 gap-8">
@@ -568,8 +577,11 @@ const EssayView: React.FC<EssayViewProps> = ({ onBack, onSuccess }) => {
           </div>
 
           <div className="flex justify-center pt-8">
-             <Button onClick={() => setViewingExample(false)} variant="primary" className="px-16 py-4 font-black uppercase tracking-widest shadow-xl shadow-enem-blue/20">
-                Entendido, voltar para minha nota
+             <Button onClick={() => {
+               setViewingExample(false);
+               window.scrollTo({ top: 0, behavior: 'smooth' });
+             }} variant="primary" className="px-16 py-4 font-black uppercase tracking-widest shadow-xl shadow-enem-blue/20">
+                Entendido, voltar para minha redação
              </Button>
           </div>
         </div>

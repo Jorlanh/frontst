@@ -29,16 +29,17 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, selectedOption, o
     <div className="max-w-3xl mx-auto mb-8 animate-fade-in group">
       <Card className="mb-4 border-slate-200/60 dark:border-slate-800/60 backdrop-blur-sm">
         <div className="flex justify-between items-start mb-4">
-          <div className="flex gap-2">
+          
+          {/* 🔥 CORREÇÃO: flex-wrap evita vazamento em telas menores caso as tags sejam grandes */}
+          <div className="flex flex-wrap gap-2">
             <Badge color="blue">{question.area}</Badge>
-            {/* 🔥 Lógica traduzida mantendo a cor original */}
             <Badge color={question.difficulty === Difficulty.HARD ? 'red' : question.difficulty === Difficulty.MEDIUM ? 'yellow' : 'green'}>
               {question.difficulty === Difficulty.HARD ? 'Difícil' : 
                question.difficulty === Difficulty.MEDIUM ? 'Médio' : 
                'Fácil'}
             </Badge>
           </div>
-          <span className="text-xs text-gray-400 dark:text-slate-500 font-mono">ID: {question.id}</span>
+          <span className="text-xs text-gray-400 dark:text-slate-500 font-mono shrink-0 ml-2">ID: {question.id}</span>
         </div>
 
         {question.context && (

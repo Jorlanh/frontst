@@ -25,7 +25,7 @@ interface ChatBotProps {
 
 const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'intro', role: 'model', text: 'Olá! Sou seu Tutor IA do ENEM. Posso te ajudar com dúvidas de qualquer matéria, explicar conteúdos, resolver questões ou dar dicas de redação. O que vamos estudar hoje?' }
+    { id: 'intro', role: 'model', text: 'Olá! Sou Enelsom: Seu Tutor IA do ENEM. Posso te ajudar com dúvidas de qualquer matéria, explicar conteúdos, resolver questões ou dar dicas de redação. O que vamos estudar hoje?' }
   ]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -91,7 +91,7 @@ const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
           className="fixed bottom-6 right-6 z-50 p-0 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 bg-purple-600 flex items-center justify-center w-16 h-16 overflow-hidden border-2 border-white dark:border-slate-800"
           aria-label="Abrir Chat Tutor ENEM"
         >
-          <img src="/ai_tutor_avatar.png" alt="Tutor IA" className="w-full h-full object-cover" />
+          <img src="/ai_tutor_avatar.png" alt="Enelsom: Seu Tutor IA" className="w-full h-full object-cover" />
         </button>
       )}
 
@@ -114,7 +114,7 @@ const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
             </div>
             <div className="flex gap-3 items-center">
                 <button 
-                  onClick={() => setMessages([{ id: 'intro', role: 'model', text: 'Olá! Sou seu Tutor IA do ENEM. Como posso ajudar?' }])}
+                  onClick={() => setMessages([{ id: 'intro', role: 'model', text: 'Olá! Sou Enelsom: Seu Tutor IA para o ENEM. Como posso ajudar?' }])}
                   className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded transition-colors font-medium"
                 >
                   Limpar
@@ -142,7 +142,7 @@ const ChatBot: React.FC<ChatBotProps> = ({ isOpen, onToggle }) => {
                       : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-100 border border-gray-100 dark:border-slate-700 rounded-tl-none'
                   }`}
                 >
-                  {msg.role === 'model' && <span className="block text-xs font-bold text-purple-600 dark:text-purple-400 mb-1">Tutor IA</span>}
+                  {msg.role === 'model' && <span className="block text-xs font-bold text-purple-600 dark:text-purple-400 mb-1">Enelsom</span>}
                   {msg.role === 'model' ? (
                     <ReactMarkdown components={markdownComponents}>{msg.text}</ReactMarkdown>
                   ) : (
