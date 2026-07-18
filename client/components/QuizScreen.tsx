@@ -37,6 +37,10 @@ export default function QuizScreen() {
   const [towerLevel, setTowerLevel] = useState(1);
   const [towerTargetCount, setTowerTargetCount] = useState(5);
 
+  // 🔥 ESTADO DE BLINDAGEM: Armazena o tema gerado na hora pela IA
+  const [dynamicTheme, setDynamicTheme] = useState<{title: string, motivatingTexts: string[]} | null>(null);
+  const [loadingTheme, setLoadingTheme] = useState(false);
+
   useEffect(() => {
     const mode = sessionStorage.getItem('studr_exam_mode');
     if (mode === 'TOWER' && !isMock) {
@@ -56,7 +60,36 @@ export default function QuizScreen() {
   const currentQuestionIndex = isMock ? mock.currentQuestionIndex : practice.currentQuestionIndex;
   const loading = isMock ? mock.loading : practice.loading;
   const handleAnswerSelect = isMock ? mock.handleAnswerSelect : practice.handleAnswerSelect;
+  const examPhase = mock.examPhase;
   
+  // 🔥 GATILHO DA IA: Busca o Tema Inédito ao entrar no Bloco da Redação
+  useEffect(() => {
+    if (isMock && examPhase === 'REDACAO_INTERVAL' && !dynamicTheme && !loadingTheme) {
+      setLoadingTheme(true);
+      apiRequest('/ai/essay-theme', 'POST')
+        .then(data => {
+          if (data && data.title) {
+            setDynamicTheme(data);
+          } else {
+            throw new Error("Formato inválido retornado pela IA");
+          }
+        })
+        .catch(err => {
+          console.warn("[Redação] IA falhou ao gerar tema inédito. Usando Fallback de Segurança.", err);
+          // Fallback para impedir a prova de quebrar caso o servidor caia
+          setDynamicTheme({
+            title: "A precarização do trabalho e o desafio da dignidade na era dos aplicativos no Brasil",
+            motivatingTexts: [
+              "Estudos recentes do IBGE indicam que milhões de brasileiros dependem de plataformas digitais para sua subsistência, atuando como entregadores, motoristas ou prestadores de serviços. Essa modalidade, muitas vezes celebrada pela flexibilidade, esconde uma ausência de direitos trabalhistas básicos, como férias remuneradas, 13º salário e acesso à Previdência Social, gerando grande insegurança.",
+              "A Constituição Federal de 1988 estabelece a dignidade da pessoa humana como um dos fundamentos da República, um princípio que se estende ao campo do trabalho. Contudo, a lógica das plataformas digitais levanta questões sobre a autonomia do trabalhador e a garantia de condições mínimas para uma vida digna.",
+              "Notícias frequentes revelam mobilizações de trabalhadores de aplicativos em diversas capitais brasileiras, que reivindicam melhores condições de trabalho, remuneração justa e o reconhecimento de um vínculo empregatício. A ausência de regulamentação clara perpetua um ciclo de vulnerabilidade econômica."
+            ]
+          });
+        })
+        .finally(() => setLoadingTheme(false));
+    }
+  }, [isMock, examPhase, dynamicTheme, loadingTheme]);
+
   const handleNext = async () => {
       const mockTarget = isMock ? mock.simuladoTargetCount : 0;
       const isMockFinished = isMock && (currentQuestionIndex + 1 >= mockTarget || mock.isTimeUp);
@@ -96,12 +129,10 @@ export default function QuizScreen() {
           setIsFinalizing(false); 
       } else {
           isMock ? await mock.handleNext() : await practice.handleNext();
-          // 🔥 Auto-scroll suave para o topo da página após carregar nova questão
           window.scrollTo({ top: 0, behavior: 'smooth' });
       }
   };
 
-  // 🔥 Auto-scroll suave também para o botão de "Anterior"
   const handlePrevious = () => {
       isMock ? mock.handlePrevious() : practice.handlePrevious();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -122,9 +153,7 @@ export default function QuizScreen() {
   const isTimeUp = mock.isTimeUp;
   const simuladoTargetCount = mock.simuladoTargetCount;
   const formatTimeFn = mock.formatTime;
-  const examPhase = mock.examPhase;
 
-  // 🔥 MAPEAMENTO DE COR E TEXTO REAL DA DIFICULDADE
   const getDifficultyColor = (diff: string) => {
     const d = String(diff).toUpperCase();
     if (d === 'EASY' || d === 'FÁCIL' || d === 'FACIL') return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800/50';
@@ -140,9 +169,24 @@ export default function QuizScreen() {
   };
 
   // =========================================================================================
-  // ✍️ TELA DE REDAÇÃO (DIA 1) - IDENTICA AO DESIGN ENVIADO (COM AS 5 COMPETÊNCIAS)
+  // ✍️ TELA DE REDAÇÃO (DIA 1) 
   // =========================================================================================
   if (isMock && examPhase === 'REDACAO_INTERVAL') {
+    // 🔥 Tela de Loading Exclusiva para a Redação
+    if (loadingTheme || !dynamicTheme) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[70vh] p-4 animate-fade-in">
+              <LoadingSpinner size="lg" />
+              <h2 className="mt-8 text-xl sm:text-2xl font-black text-enem-blue dark:text-blue-400 uppercase tracking-widest text-center animate-pulse">
+                A Banca Oficial está elaborando...
+              </h2>
+              <p className="text-sm text-slate-500 mt-2 text-center font-medium">
+                Sintetizando fatos históricos, dados IBGE e notícias recentes para criar um tema inédito.
+              </p>
+            </div>
+        );
+    }
+
     const APPROX_WORDS_PER_LINE = 10;
     const MIN_PALAVRAS = 80;
     const MIN_LINHAS = 7;
@@ -182,12 +226,9 @@ export default function QuizScreen() {
       { id: 5, name: "Proposta de Intervenção", desc: "Elaborar proposta de intervenção para o problema respeitando os direitos humanos." }
     ];
 
-    const mockTheme = "A precarização do trabalho e o desafio da dignidade na era dos aplicativos no Brasil";
-    const motivatingTexts = [
-      "Estudos recentes do IBGE indicam que milhões de brasileiros dependem de plataformas digitais para sua subsistência, atuando como entregadores, motoristas ou prestadores de serviços. Essa modalidade, muitas vezes celebrada pela flexibilidade, esconde uma ausência de direitos trabalhistas básicos, como férias remuneradas, 13º salário e acesso à Previdência Social, gerando grande insegurança.",
-      "A Constituição Federal de 1988 estabelece a dignidade da pessoa humana como um dos fundamentos da República, um princípio que se estende ao campo do trabalho. Contudo, a lógica das plataformas digitais levanta questões sobre a autonomia do trabalhador e a garantia de condições mínimas para uma vida digna.",
-      "Notícias frequentes revelam mobilizações de trabalhadores de aplicativos em diversas capitais brasileiras, que reivindicam melhores condições de trabalho, remuneração justa e o reconhecimento de um vínculo empregatício. A ausência de regulamentação clara perpetua um ciclo de vulnerabilidade econômica."
-    ];
+    // 🔥 TEMA DINÂMICO INJETADO
+    const mockTheme = dynamicTheme.title;
+    const motivatingTexts = dynamicTheme.motivatingTexts;
 
     const handleAdvanceToDay2 = () => {
       if (!canSubmit) {
@@ -195,7 +236,6 @@ export default function QuizScreen() {
         return;
       }
       mock.startDay2();
-      // 🔥 Auto-scroll suave após avançar de dia
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 

@@ -448,7 +448,7 @@ export default function HomeView() {
       {/* ========================================= */}
       <BentoCard
         className="md:col-span-4 min-h-[260px]"
-        locked={!hasFullAccess}
+        locked={!(hasFullAccess || isSimuladoPlan)}
         onLockedClick={openPricing}
       >
         <div className="flex flex-col h-full">

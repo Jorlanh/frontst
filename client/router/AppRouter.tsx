@@ -89,7 +89,9 @@ export function AppRouter() {
     !window.location.hostname.includes('railway.app');
 
   const [currentReviewExamId, setCurrentReviewExamId] = React.useState<string | null>(null);
-  const isMock = view === AppView.MOCK_EXAM;
+  
+  // 🔥 CORREÇÃO DE ALTA PRIORIDADE (Garante a persistência do Mock Mode nos Resultados)
+  const isMockSession = mock.simuladoMode !== null;
 
   // =====================================
   // ESTADOS PARA O MODAL DE CONFIGURAÇÃO / SENHA
@@ -388,16 +390,17 @@ export function AppRouter() {
       {view === AppView.HOME && <HomeView />}
       {(view === AppView.PRACTICE || view === AppView.MOCK_EXAM) && <QuizScreen />}
       
+      {/* 🔥 RENDENRIZAÇÃO DE RESULTADOS CORRIGIDA */}
       {view === AppView.RESULTS && (
         <ResultsView
-          questions={isMock ? mockQuestions : practice.questions}
-          userAnswers={isMock ? mockAnswers : practice.userAnswers}
-          finalScore={isMock ? (lastExamScore ?? 0) : practice.calculateScore()}
+          questions={isMockSession ? mockQuestions : practice.questions}
+          userAnswers={isMockSession ? mockAnswers : practice.userAnswers}
+          finalScore={isMockSession ? (lastExamScore ?? 0) : practice.calculateScore()}
           onBackToHome={() => navigate(AppView.HOME)}
-          scoreBand={isMock ? (lastExamBand ?? 'N/A') : 'N/A'}
+          scoreBand={isMockSession ? (lastExamBand ?? 'N/A') : 'N/A'}
           onNewMockExam={() => startSimulado(simuladoMode ?? 'FULL', simuladoTargetArea ?? undefined)}
           onPracticeMore={() => startPractice(selectedArea, activeSessionTopic || undefined, false)}
-          timeElapsed={isMock ? formatTime(examDuration - timeRemaining) : 'Modo Prática'}
+          timeElapsed={isMockSession ? formatTime(examDuration - timeRemaining) : 'Modo Prática'}
         />
       )}
 

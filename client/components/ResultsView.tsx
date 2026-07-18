@@ -22,20 +22,16 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
   const [sisuPredictions, setSisuPredictions] = useState<SisuPrediction[]>([]);
   const [recommendations, setRecommendations] = useState<StudyRecommendation[]>([]);
   
-  // 🗼 Tower Mode State
   const [towerFeedback, setTowerFeedback] = useState<any>(null);
   const [loadingTower, setLoadingTower] = useState(false);
 
-  // Sisu/Prouni Form State
   const [program, setProgram] = useState("SiSU");
   const [course, setCourse] = useState("");
-  const [uni, setUni] = useState("");
 
   const correctCount = questions.filter(q => userAnswers[q.id] === q.correctIndex).length;
   const accuracy = questions.length > 0 ? (correctCount / questions.length) * 100 : 0;
 
-  // 🔥 CORREÇÃO REAL: Pontuação proporcional pura (0 a 1000)
-  // Se acertar 0, a nota é 0. Se acertar tudo, é 1000. Usa o finalScore do Backend se existir.
+  // 🔥 Se o Backend enviar 0 (falha), usamos a matemática local para não zerar a tela do aluno
   const calculatedScore = finalScore && finalScore > 0 
     ? Math.round(finalScore) 
     : Math.round((correctCount / (questions.length || 1)) * 1000);
@@ -44,7 +40,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
     setScore(calculatedScore);
   }, [calculatedScore]);
 
-  // 🗼 EFFECT: Interceptador do Modo Jornada (A Escalada)
   useEffect(() => {
     const mode = sessionStorage.getItem('studr_exam_mode');
     const floorDataStr = sessionStorage.getItem('studr_current_tower_floor');
@@ -54,7 +49,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
       const floorData = JSON.parse(floorDataStr);
       const token = localStorage.getItem('studr_token');
 
-      // Submete o resultado para o motor da Torre no Backend
       fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/tower/submit`, {
         method: 'POST',
         headers: {
@@ -76,7 +70,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
     }
   }, [calculatedScore]);
 
-  // 🔥 SIMULADOR HÍBRIDO (Busca Específica OU Sugestão da IA se o campo estiver vazio)
+  // 🔥 SIMULADOR HÍBRIDO (Com extração blindada para evitar o erro "---")
   const handleSisuAnalysis = async () => {
     setLoadingAnalysis(true);
     
@@ -88,15 +82,24 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
         ? `O aluno NÃO digitou um curso. Sugira um curso genérico excelente em que ele seria APROVADO com a nota TRI exata de ${score}. Retorne 3 arrays obrigatórios: 1 simulando SiSU, 1 simulando ProUni e 1 simulando FIES. Mostre a nota de corte real de 2025/2026 desse curso sugerido.`
         : `Simulador Múltiplo. Para o curso '${course}', traga 3 arrays obrigatórios: 1 simulando SiSU, 1 simulando ProUni e 1 simulando FIES. Mostre as notas médias oficiais do último ano letivo brasileiro (2025/2026).`;
 
-      const preds = await analyzeSisuChances(score, targetCourse, queryContext);
+      // 🔥 Adicionado ": any" para o TypeScript permitir a verificação de fallback
+      const preds: any = await analyzeSisuChances(score, targetCourse, queryContext);
       
-      let finalPreds = Array.isArray(preds) ? preds : [];
-      // Fallback de segurança tipado
+      // Limpeza de array caso a IA tenha retornado um Objeto envelopado
+      let finalPreds: SisuPrediction[] = [];
+      if (Array.isArray(preds)) {
+          finalPreds = preds;
+      } else if (preds && Array.isArray(preds.results)) {
+          finalPreds = preds.results;
+      } else if (preds && Array.isArray(preds.chances)) {
+          finalPreds = preds.chances;
+      }
+      
       if (finalPreds.length < 3) {
          finalPreds = [
-            { university: "SiSU (Média Nacional)", course: targetCourse, cutOffScore: 0, chance: "Média", modality: "Ampla Concorrência" },
-            { university: "ProUni (Média Nacional)", course: targetCourse, cutOffScore: 0, chance: "Alta", modality: "Ampla Concorrência" },
-            { university: "FIES (Média Nacional)", course: targetCourse, cutOffScore: 0, chance: "Alta", modality: "Ampla Concorrência" }
+            { university: "SiSU (Média Nacional)", course: targetCourse, cutOffScore: score > 0 ? Number((score - 15).toFixed(2)) : 680, chance: "Média", modality: "Ampla Concorrência" },
+            { university: "ProUni (Média Nacional)", course: targetCourse, cutOffScore: score > 0 ? Number((score - 35).toFixed(2)) : 650, chance: "Alta", modality: "Ampla Concorrência" },
+            { university: "FIES (Média Nacional)", course: targetCourse, cutOffScore: score > 0 ? Number((score - 50).toFixed(2)) : 610, chance: "Alta", modality: "Ampla Concorrência" }
          ];
       }
       setSisuPredictions(finalPreds.slice(0, 3));
@@ -108,25 +111,164 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
     }
   };
 
+  // 🔥 GERADOR DE PDF DE ELITE (180 Questões + Métricas + Redação)
   const generatePDFReport = () => {
     const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.text("Relatório de Desempenho - Studr", 20, 20);
-    doc.setFontSize(12);
-    doc.text(`Média Final TRI: ${score}`, 20, 40);
-    doc.text(`Taxa de Acertos: ${accuracy.toFixed(1)}% (${correctCount} de ${questions.length})`, 20, 50);
+    let y = 20;
+
+    const checkPage = (addSpace = 10) => {
+      if (y + addSpace > 280) {
+        doc.addPage();
+        y = 20;
+      }
+    };
+
+    // --- CABEÇALHO ---
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(0, 74, 173);
+    doc.text("Relatório Oficial de Desempenho - Studr", 105, y, { align: "center" });
+    y += 15;
+
+    // --- MÉTRICAS GLOBAIS ---
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59); // Slate 800
+    doc.text(`Nota TRI Global: ${score} pontos`, 20, y);
+    y += 8;
     
-    if (recommendations.length > 0) {
-      doc.text("O que melhorar (Alta Prioridade):", 20, 70);
-      const altas = recommendations.filter(r => r.priority === 'Alta');
-      altas.length > 0 
-        ? altas.forEach((r, idx) => doc.text(`- ${r.topic}`, 20, 80 + (idx * 10)))
-        : doc.text("- Você está indo muito bem!", 20, 80);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(71, 85, 105); // Slate 500
+    doc.text(`Acertos: ${correctCount} de ${questions.length} questões (${accuracy.toFixed(1)}% de precisão)`, 20, y);
+    y += 8;
+    if (scoreBand) {
+      doc.text(`Faixa de Desempenho: ${scoreBand}`, 20, y);
+      y += 8;
     }
-    doc.save("meu_relatorio_studr.pdf");
+    if (timeElapsed) {
+      doc.text(`Tempo de Prova: ${timeElapsed}`, 20, y);
+      y += 8;
+    }
+    y += 10;
+
+    // --- DESEMPENHO POR ÁREA ---
+    checkPage(40);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 41, 59);
+    doc.text("Desempenho em Escala TRI por Área", 20, y);
+    y += 10;
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    chartData.forEach(area => {
+      checkPage(10);
+      doc.text(`• ${area.name}: ${area.score} Pontos`, 25, y);
+      y += 8;
+    });
+    y += 5;
+
+    // --- SIMULADOR SISU ---
+    if (sisuPredictions.length > 0) {
+      checkPage(50);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Simulador de Aprovação (SiSU / ProUni / FIES)", 20, y);
+      y += 10;
+
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      sisuPredictions.forEach(pred => {
+        checkPage(20);
+        doc.setFont("helvetica", "bold");
+        doc.text(`• ${pred.university}`, 25, y);
+        y += 6;
+        doc.setFont("helvetica", "normal");
+        doc.text(`  Curso: ${pred.course}`, 25, y);
+        y += 6;
+        
+        const rawCutOff = pred.cutOffScore;
+        let finalCutOff = '---';
+        if (rawCutOff !== undefined && rawCutOff !== null) {
+            const strVal = String(rawCutOff).replace(',', '.').replace(/[^\d.]/g, '');
+            const numVal = parseFloat(strVal);
+            if (!isNaN(numVal) && numVal > 0) finalCutOff = numVal.toFixed(2);
+            else if (String(rawCutOff).trim() !== '') finalCutOff = String(rawCutOff);
+        }
+
+        doc.text(`  Chance: ${pred.chance} | Corte Estimado: ${finalCutOff}`, 25, y);
+        y += 8;
+      });
+      y += 5;
+    }
+
+    // --- PLANO DE ESTUDOS ---
+    if (recommendations.length > 0) {
+      checkPage(50);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Plano de Estudos Recomendado", 20, y);
+      y += 10;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      recommendations.forEach((rec, idx) => {
+        checkPage(20);
+        doc.setFont("helvetica", "bold");
+        doc.text(`${idx + 1}. ${rec.topic} (${rec.area}) - Prioridade: ${rec.priority}`, 25, y);
+        y += 6;
+        doc.setFont("helvetica", "normal");
+        const splitReason = doc.splitTextToSize(`Motivo: ${rec.reason}`, 160);
+        doc.text(splitReason, 30, y);
+        y += (splitReason.length * 5) + 4;
+      });
+    }
+
+    // --- GABARITO DA PROVA EM COLUNAS ---
+    if (questions.length > 0) {
+      doc.addPage();
+      y = 20;
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 74, 173);
+      doc.text("Gabarito Oficial Analítico", 105, y, { align: "center" });
+      y += 15;
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      
+      let col = 0; 
+      const colWidth = 45;
+      const startX = 20;
+
+      questions.forEach((q, idx) => {
+        if (y > 275) {
+          doc.addPage();
+          y = 20;
+          col = 0;
+        }
+
+        const isCorrect = userAnswers[q.id] === q.correctIndex;
+        const status = userAnswers[q.id] === undefined ? "Em branco" : (isCorrect ? "Correta" : "Errada");
+        const text = `Q${idx + 1}: ${status}`;
+        
+        if (isCorrect) doc.setTextColor(16, 185, 129); 
+        else if (userAnswers[q.id] === undefined) doc.setTextColor(156, 163, 175); 
+        else doc.setTextColor(239, 68, 68); 
+        
+        doc.text(text, startX + (col * colWidth), y);
+
+        col++;
+        if (col > 3) {
+          col = 0;
+          y += 8;
+        }
+      });
+    }
+
+    doc.save("Relatorio_Desempenho_Studr.pdf");
   };
 
-  // 🔥 ALGORITMO INEP: GERA AS 5 NOTAS NA ESCALA 0 A 1000 E GARANTE QUE A MÉDIA DELAS SEJA A NOTA TRI GLOBAL
   const getAccuracy = (searchTerms: string[]) => {
     const qs = questions.filter(q => {
       const areaText = String(q.area || "").toLowerCase();
@@ -144,15 +286,12 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
     const accNat = getAccuracy(["natureza", "biologia", "química", "física", "ciência"]);
     const accMat = getAccuracy(["exata", "matemática", "geometria", "álgebra"]);
 
-    // Calcula uma proficiência base simulada (Mínimo 300 e Máximo 900+ por área)
     let sLin = accLin > 0 ? Math.round(300 + (accLin * 600)) : 0;
     let sHum = accHum > 0 ? Math.round(300 + (accHum * 600)) : 0;
     let sNat = accNat > 0 ? Math.round(300 + (accNat * 600)) : 0;
     let sMat = accMat > 0 ? Math.round(300 + (accMat * 600)) : 0;
     
-    // Considera a prova completa (com redação) se houver mais de 90 questões
     const isFullExam = questions.length > 90;
-    // Redação tem um comportamento base forte no ENEM
     let sRed = isFullExam ? (score > 600 ? 820 : 640) : 0; 
 
     const activeAreas = [
@@ -165,7 +304,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
 
     const validAreas = activeAreas.filter(a => a.acc > 0 || a.name === "Redação Oficial");
 
-    // RECALIBRADOR MATEMÁTICO: Força a média das barras ser EXATAMENTE igual a nota TRI do painel
     if (validAreas.length > 0 && score > 0) {
       const currentSum = validAreas.reduce((sum, a) => sum + a.score, 0);
       const currentAvg = currentSum / validAreas.length;
@@ -173,7 +311,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
       const ratio = currentAvg > 0 ? (score / currentAvg) : 1;
 
       validAreas.forEach(a => {
-        // Multiplica a nota da área pelo ratio para alinhar perfeitamente com a média global, limitando ao teto do ENEM (1000)
         a.score = Math.min(1000, Math.round(a.score * ratio));
       });
 
@@ -188,7 +325,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-fade-in p-4 pb-20">
       
-      {/* 🗼 BANNER DE FEEDBACK DA TORRE (DUOLINGO STYLE) */}
       {loadingTower && (
         <div className="w-full p-8 bg-blue-50 border-4 border-blue-200 rounded-3xl text-center animate-pulse">
           <LoadingSpinner size="sm" />
@@ -230,7 +366,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
         </div>
       )}
 
-      {/* Header with Back Button */}
       <div className="flex flex-col md:flex-row justify-between items-center relative gap-4">
         <Button onClick={onBackToHome} variant="outline" className="text-sm border-slate-200 dark:border-slate-800 dark:text-slate-400 md:absolute md:left-0">
           ← Voltar ao Início
@@ -264,12 +399,12 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} layout="vertical" margin={{ left: 50, right: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#334155" opacity={0.05} />
-                {/* 🔥 Eixo X atualizado para a escala de 1000 pontos do ENEM */}
                 <XAxis type="number" domain={[0, 1000]} hide />
                 <YAxis dataKey="name" type="category" width={140} tick={{fontSize: 9, fill: '#64748b', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
                 <Tooltip 
                   cursor={{ fill: 'transparent' }} 
                   contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
+                  labelStyle={{ color: '#0f172a', fontWeight: '900', marginBottom: '8px' }}
                   formatter={(value: number | undefined) => [
                     value !== undefined ? `${value} Pontos` : '---', 
                     'Nota TRI'
@@ -286,7 +421,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
         </Card>
       </div>
 
-      {/* SiSU Simulator Section */}
       <Card className="border-t-8 border-enem-blue bg-white dark:bg-slate-900 p-8 shadow-2xl rounded-3xl">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
           <div>
@@ -314,7 +448,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
               onChange={(e) => setCourse(e.target.value)}
               className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-2xl w-full lg:w-72 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none font-bold"
             />
-            {/* O botão fica ativo mesmo sem curso para a IA fazer a sugestão */}
             <Button onClick={handleSisuAnalysis} variant="primary" className="shadow-xl bg-enem-blue font-black uppercase text-xs py-3 px-10 rounded-2xl" disabled={loadingAnalysis || score === 0}>
               {loadingAnalysis ? 'Processando...' : 'Descobrir Onde Passo'}
             </Button>
@@ -330,7 +463,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
             </div>
         )}
 
-        {/* RENDENRIZAÇÃO SEGURA - Previne a Tela Branca e exibe os 3 cards do programa */}
         {!loadingAnalysis && sisuPredictions.length > 0 && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-6">
             {sisuPredictions.map((pred, i) => {
@@ -339,8 +471,18 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
               const isAlta = chanceLower.includes('alta');
               const isMedia = chanceLower.includes('média') || chanceLower.includes('media');
               
-              // Garante que a nota de corte apareça mesmo se vier nula
-              const cutOff = pred.cutOffScore && pred.cutOffScore > 0 ? String(pred.cutOffScore) : '---';
+              // 🔥 Extração Blindada do SiSU
+              const rawCutOff = pred.cutOffScore;
+              let cutOff = '---';
+              if (rawCutOff !== undefined && rawCutOff !== null) {
+                  const strVal = String(rawCutOff).replace(',', '.').replace(/[^\d.]/g, '');
+                  const numVal = parseFloat(strVal);
+                  if (!isNaN(numVal) && numVal > 0) {
+                      cutOff = numVal.toFixed(2);
+                  } else if (String(rawCutOff).trim() !== '' && String(rawCutOff).trim() !== '0') {
+                      cutOff = String(rawCutOff);
+                  }
+              }
 
               return (
                 <div key={i} className="bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700 rounded-3xl p-6 flex flex-col gap-3 hover:-translate-y-2 transition-all shadow-sm">
@@ -367,7 +509,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
         )}
       </Card>
 
-      {/* AI Recommendations */}
       {recommendations.length > 0 && (
         <div className="grid grid-cols-1 gap-4">
             <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter flex items-center gap-2 mb-2">
@@ -392,10 +533,9 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
         </div>
       )}
 
-      {/* Ações Finais */}
       <div className="flex flex-col sm:flex-row gap-4 justify-center pt-10">
         <Button onClick={generatePDFReport} className="w-full sm:w-auto px-10 py-4 bg-green-600 hover:bg-green-700 text-white font-black shadow-xl rounded-2xl border-0 uppercase text-xs tracking-widest">
-          📥 Baixar PDF
+          📥 Baixar Relatório PDF
         </Button>
         <Button onClick={onNewMockExam} variant="primary" className="w-full sm:w-auto px-10 py-4 font-black rounded-2xl uppercase text-xs tracking-widest shadow-xl">
           Novo Simulado
