@@ -41,24 +41,27 @@ const HIERARCHICAL_SUBJECTS: Record<string, Record<string, string[]>> = {
 
 // ─── League helpers ───────────────────────────────────────────────────────────
 const LEAGUE_LABEL: Record<string, string> = {
-  BRONZE:  'Bronze',
-  SILVER:  'Prata',
-  GOLD:    'Ouro',
-  DIAMOND: 'Diamante',
+  BRONZE:     'Bronze',
+  SILVER:     'Prata',
+  GOLD:       'Ouro',
+  DIAMOND:    'Diamante',
+  CHALLENGER: 'Challenger', 
 };
 
 const LEAGUE_COLOR: Record<string, string> = {
-  BRONZE:  'from-amber-700  to-amber-500',
-  SILVER:  'from-slate-500  to-slate-400',
-  GOLD:    'from-yellow-500 to-yellow-400',
-  DIAMOND: 'from-cyan-500   to-blue-400',
+  BRONZE:     'from-amber-700  to-amber-500',
+  SILVER:     'from-slate-500  to-slate-400',
+  GOLD:       'from-yellow-500 to-yellow-400',
+  DIAMOND:    'from-cyan-500   to-blue-400',
+  CHALLENGER: 'from-red-600    to-orange-500', 
 };
 
 const LEAGUE_ICON: Record<string, string> = {
-  BRONZE:  '🥉',
-  SILVER:  '🥈',
-  GOLD:    '🥇',
-  DIAMOND: '💎',
+  BRONZE:     '🥉',
+  SILVER:     '🥈',
+  GOLD:       '🥇',
+  DIAMOND:    '💎',
+  CHALLENGER: '🔥', 
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -77,7 +80,6 @@ interface RankingEntry {
 
 interface RankingData {
   league: string;
-  leagueLabel: string;
   myPosition: number;
   totalInLeague: number;
   entries: RankingEntry[];
@@ -86,6 +88,7 @@ interface RankingData {
 // ─── Component ────────────────────────────────────────────────────────────────
 const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErrors, isLoading = false }) => {
   const [activeTab, setActiveTab] = useState<'PROGRESS' | 'RANKING'>('PROGRESS');
+  const [showRulesModal, setShowRulesModal] = useState(false);
 
   // Gamification state
   const [state, setState] = useState<ServerGamificationState | null>(null);
@@ -119,6 +122,79 @@ const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErr
       .finally(() => setLoadingRanking(false));
   }, []);
 
+  // ─── Rules Modal ─────────────────────────────────────────────────────────────
+  const renderRulesModal = () => {
+    if (!showRulesModal) return null;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in p-4">
+        <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+            <h2 className="text-xl font-black text-gray-800 dark:text-slate-100 flex items-center gap-2">
+              <span>📖</span> Manual do Competidor
+            </h2>
+            <button onClick={() => setShowRulesModal(false)} className="text-gray-400 hover:text-red-500 transition-colors">
+              ✕ Fechar
+            </button>
+          </div>
+          
+          <div className="p-6 overflow-y-auto space-y-8 custom-scrollbar">
+            {/* Ligas e Rebaixamento */}
+            <section>
+              <h3 className="text-lg font-bold text-enem-blue dark:text-blue-400 mb-3 border-l-4 border-enem-blue pl-3">A Guerra das Ligas</h3>
+              <p className="text-sm text-gray-600 dark:text-slate-400 mb-4 leading-relaxed">
+                Toda semana é uma nova corrida. O ranking é restrito à sua Liga atual e reiniciado <strong>toda segunda-feira à 00:05</strong>. Seus resultados definem seu destino:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-100 dark:border-green-800/50">
+                  <div className="font-bold text-green-700 dark:text-green-400 text-sm">⬆️ Top 20% (Promoção)</div>
+                  <p className="text-xs text-gray-600 dark:text-slate-400 mt-1">Os melhores da liga avançam para a próxima divisão.</p>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <div className="font-bold text-slate-700 dark:text-slate-300 text-sm">➖ Middle 60% (Manutenção)</div>
+                  <p className="text-xs text-gray-600 dark:text-slate-400 mt-1">Garantem a permanência na divisão atual.</p>
+                </div>
+                <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-100 dark:border-red-800/50">
+                  <div className="font-bold text-red-700 dark:text-red-400 text-sm">⬇️ Bottom 20% (Rebaixamento)</div>
+                  <p className="text-xs text-gray-600 dark:text-slate-400 mt-1">Caem de volta para a divisão inferior por baixo desempenho.</p>
+                </div>
+              </div>
+              
+              <div className="flex flex-col gap-2 mt-4 bg-slate-50 dark:bg-slate-800/30 p-4 rounded-xl">
+                <div className="flex justify-between items-center text-sm"><span className="flex items-center gap-2">🥉 <strong>Bronze</strong> (Ponto de partida)</span> <span>Acesso inicial</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="flex items-center gap-2">🥈 <strong>Prata</strong> (Massa geral)</span> <span>Intermediário</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="flex items-center gap-2">🥇 <strong>Ouro</strong> (Avançado)</span> <span>Alta concorrência</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="flex items-center gap-2">💎 <strong>Diamante</strong> (Elite)</span> <span>Zona de precisão</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="flex items-center gap-2">🔥 <strong className="text-red-500">Challenger</strong> (O Panteão)</span> <span>O limite máximo</span></div>
+              </div>
+            </section>
+
+            {/* Streak Multipliers */}
+            <section>
+              <h3 className="text-lg font-bold text-orange-500 dark:text-orange-400 mb-3 border-l-4 border-orange-500 pl-3">Ofensiva (Streak) e Multiplicadores de XP</h3>
+              <p className="text-sm text-gray-600 dark:text-slate-400 mb-4 leading-relaxed">
+                A disciplina vale mais que o esforço esporádico. Estude todos os dias sem falhar para multiplicar a experiência que você ganha em cada questão:
+              </p>
+              <div className="bg-slate-900 text-slate-200 rounded-xl p-4 font-mono text-sm shadow-inner">
+                <ul className="space-y-2">
+                  <li className="flex justify-between border-b border-slate-800 pb-2"><span>🔥 3 dias seguidos</span> <strong className="text-blue-400">1.1x (+10% de XP)</strong></li>
+                  <li className="flex justify-between border-b border-slate-800 pb-2"><span>🔥 7 dias seguidos</span> <strong className="text-blue-400">1.2x (+20% de XP)</strong></li>
+                  <li className="flex justify-between border-b border-slate-800 pb-2"><span>🔥 15 dias seguidos</span> <strong className="text-blue-400">1.3x (+30% de XP)</strong></li>
+                  <li className="flex justify-between border-b border-slate-800 pb-2"><span>🔥 30 dias seguidos</span> <strong className="text-blue-400">1.5x (+50% de XP)</strong></li>
+                  <li className="flex justify-between border-b border-slate-800 pb-2"><span>🔥 60 dias seguidos</span> <strong className="text-blue-400">1.7x (+70% de XP)</strong></li>
+                  <li className="flex justify-between pt-1 text-orange-400"><span>🔥 100 dias seguidos</span> <strong>2.0x (XP EM DOBRO)</strong></li>
+                </ul>
+              </div>
+            </section>
+          </div>
+          
+          <div className="p-4 border-t border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+            <Button className="w-full" onClick={() => setShowRulesModal(false)}>Entendido, vamos competir</Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ─── Ranking Tab ─────────────────────────────────────────────────────────────
   const renderRanking = () => {
     if (loadingRanking) return <LoadingSpinner />;
@@ -127,17 +203,16 @@ const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErr
 
     const league = ranking.league;
 
-    // 🔥 MOTOR DE AUTO-ORDENAÇÃO: Garante o ranking correto baseado no XP absoluto, mesmo se o backend falhar
+    // 🔥 MOTOR DE AUTO-ORDENAÇÃO Visual
     const sortedEntries = [...ranking.entries].sort((a, b) => {
-      if (b.weeklyXp !== a.weeklyXp) return b.weeklyXp - a.weeklyXp; // Ordena por XP
-      if (b.level !== a.level) return b.level - a.level; // Desempate 1: Nível
-      return a.name.localeCompare(b.name); // Desempate 2: Ordem Alfabética
+      if (b.weeklyXp !== a.weeklyXp) return b.weeklyXp - a.weeklyXp; 
+      if (b.level !== a.level) return b.level - a.level; 
+      return a.name.localeCompare(b.name); 
     }).map((entry, index) => ({
       ...entry,
-      rank: index + 1 // Recalcula a posição oficial
+      rank: index + 1 
     }));
 
-    // Recalcula a sua posição real na liga
     const myCorrectedPosition = sortedEntries.find(e => e.isMe)?.rank || ranking.myPosition;
 
     return (
@@ -209,7 +284,7 @@ const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErr
         </div>
 
         <p className="text-xs text-center text-gray-400 dark:text-slate-500">
-          Ranking baseado no XP semanal • Reset toda segunda-feira • Top 20% sobe de liga
+          Ranking restrito à sua Liga • Reset toda segunda-feira • Top 20% sobe | Bot 20% cai
         </p>
       </div>
     );
@@ -467,24 +542,33 @@ const GamificationView: React.FC<GamificationViewProps> = ({ onBack, onReviewErr
 
   return (
     <div className="max-w-6xl mx-auto p-4 animate-fade-in pb-20">
+      {renderRulesModal()}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-4">
           <Button variant="outline" onClick={onBack} className="text-sm">← Voltar</Button>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">🎮 Central de Conquistas</h1>
         </div>
-        <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-lg flex gap-1">
+        <div className="flex flex-wrap items-center gap-3">
           <button
-            onClick={() => setActiveTab('PROGRESS')}
-            className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'PROGRESS' ? 'bg-white dark:bg-slate-700 shadow text-enem-blue dark:text-blue-400' : 'text-gray-500 hover:text-gray-700 dark:text-slate-400'}`}
+            onClick={() => setShowRulesModal(true)}
+            className="px-3 py-1.5 rounded-md text-xs font-bold border border-enem-blue/30 text-enem-blue hover:bg-enem-blue/10 dark:border-blue-500/30 dark:text-blue-400 dark:hover:bg-blue-500/10 transition-colors shadow-sm"
           >
-            Meu Progresso
+            📖 Regras e Multiplicadores
           </button>
-          <button
-            onClick={() => setActiveTab('RANKING')}
-            className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'RANKING' ? 'bg-white dark:bg-slate-700 shadow text-enem-blue dark:text-blue-400' : 'text-gray-500 hover:text-gray-700 dark:text-slate-400'}`}
-          >
-            🏆 Ranking da Liga
-          </button>
+          <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-lg flex gap-1 shadow-inner">
+            <button
+              onClick={() => setActiveTab('PROGRESS')}
+              className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'PROGRESS' ? 'bg-white dark:bg-slate-700 shadow text-enem-blue dark:text-blue-400' : 'text-gray-500 hover:text-gray-700 dark:text-slate-400'}`}
+            >
+              Meu Progresso
+            </button>
+            <button
+              onClick={() => setActiveTab('RANKING')}
+              className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'RANKING' ? 'bg-white dark:bg-slate-700 shadow text-enem-blue dark:text-blue-400' : 'text-gray-500 hover:text-gray-700 dark:text-slate-400'}`}
+            >
+              🏆 Ranking da Liga
+            </button>
+          </div>
         </div>
       </div>
       {activeTab === 'RANKING' ? renderRanking() : renderProgress()}

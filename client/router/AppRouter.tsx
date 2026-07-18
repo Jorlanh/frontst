@@ -20,7 +20,7 @@ import GamificationView from '../components/GamificationView';
 import ExamHistoryView from '../components/ExamHistoryView';
 import ExamReviewView from '../components/ExamReviewView';
 import TowerView from '../components/TowerView';
-import AdminShell from '../components/AdminShell'; // 🔥 GARANTINDO O IMPORT AQUI
+import AdminShell from '../components/AdminShell'; 
 import LandingPage from '../components/LandingPageV3';
 import AffiliateLandingPage from '../components/AffiliateLandingPage';
 import AffiliateApplicationView from '../components/AffiliateApplicationView';
@@ -120,7 +120,6 @@ export function AppRouter() {
 
     try {
       const token = localStorage.getItem('studr_token');
-      // Proteção contra URL indefinida
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
       
       const response = await fetch(`${baseUrl}/users/change-password`, {
@@ -132,7 +131,6 @@ export function AppRouter() {
         body: JSON.stringify({ currentPassword, newPassword })
       });
 
-      // Tratamento de resposta vazia ou erro
       const text = await response.text();
       const data = text ? JSON.parse(text) : {};
 
@@ -212,7 +210,6 @@ export function AppRouter() {
     return <AffiliateDashboardView user={user} onLogout={handleLogout} />;
   }
 
-  // 🔥 VIEW COMPLETA DO PAINEL ADMIN COM TUDO
   if (view === AppView.ADMIN_PANEL && user?.role === 'ADMIN') {
     return <AdminShell onBack={() => navigate(AppView.HOME)} />;
   }
@@ -391,7 +388,6 @@ export function AppRouter() {
       {view === AppView.HOME && <HomeView />}
       {(view === AppView.PRACTICE || view === AppView.MOCK_EXAM) && <QuizScreen />}
       
-      {/* 🔥 BLOCO CORRIGIDO ABAIXO */}
       {view === AppView.RESULTS && (
         <ResultsView
           questions={isMock ? mockQuestions : practice.questions}
@@ -431,18 +427,36 @@ export function AppRouter() {
       {view === AppView.STUDY_GUIDE && <StudyMapView onBack={() => navigate(AppView.HOME)} />}
       {view === AppView.GAMIFICATION && (
         <GamificationView 
-          onBack={() => setView(AppView.HOME)} 
+          onBack={() => navigate(AppView.HOME)} 
           onReviewErrors={(areaId, subTopic) => {
-              // Se vier uma submatéria específica, inicie a prática focada nela!
-              if (subTopic) {
-                  // O startPractice precisa receber (Area, Tópico Especifico)
-                  startPractice(areaId || AreaOfKnowledge.MIXED, subTopic);
-              } else {
-                  // Se for o botão geral (que não passa subTopic), manda revisar tudo
-                  reviewErrors(); // Ou qualquer função que você usa pra gerar revisão geral
-              }
+            let mappedArea = AreaOfKnowledge.MIXED;
+            
+            if (areaId) {
+                switch (areaId.toUpperCase()) {
+                    case 'LINGUAGENS':
+                        mappedArea = AreaOfKnowledge.LINGUAGENS;
+                        break;
+                    case 'HUMANAS':
+                        mappedArea = AreaOfKnowledge.HUMANAS;
+                        break;
+                    case 'NATUREZA':
+                        mappedArea = AreaOfKnowledge.NATUREZA;
+                        break;
+                    case 'EXATAS':
+                        mappedArea = AreaOfKnowledge.EXATAS;
+                        break;
+                    default:
+                        mappedArea = AreaOfKnowledge.MIXED;
+                }
+            }
+            
+            if (subTopic) {
+                practice.startPractice(mappedArea, subTopic);
+            } else {
+                practice.startPractice(AreaOfKnowledge.MIXED);
+            }
           }} 
-      />
+        />
       )}
       
       {/* 🗼 TOWER VIEW CONECTADA AO GAME LOOP */}

@@ -268,9 +268,12 @@ const ResultsView: React.FC<ResultsViewProps> = ({ questions, userAnswers, final
                 <XAxis type="number" domain={[0, 1000]} hide />
                 <YAxis dataKey="name" type="category" width={140} tick={{fontSize: 9, fill: '#64748b', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
                 <Tooltip 
-                  cursor={{fill: 'transparent'}} 
+                  cursor={{ fill: 'transparent' }} 
                   contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
-                  formatter={(value: number) => [`${value} Pontos`, 'Nota TRI']}
+                  formatter={(value: number | undefined) => [
+                    value !== undefined ? `${value} Pontos` : '---', 
+                    'Nota TRI'
+                  ]}
                 />
                 <Bar dataKey="score" radius={[0, 10, 10, 0]} barSize={20}>
                   {chartData.map((entry, index) => (
